@@ -246,6 +246,85 @@ nav .ico{font-size:17px;line-height:1}
 .meta{font:500 11px/1 var(--f-data);color:var(--ink-3);letter-spacing:.4px}
 .row-2{display:flex;gap:9px}
 .row-2 > *{flex:1}
+
+.cap-row{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}
+.cap-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;
+  background:var(--acc-soft);border:1px solid var(--acc);color:var(--acc);
+  font-size:13px;font-weight:560;
+}
+.cap-btn.plain{background:transparent;border-color:var(--line);color:var(--ink-2)}
+.cap-btn[disabled]{opacity:.5;cursor:wait}
+.thumbs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.thumbs img{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.thumbs .drop{
+  position:relative;
+}
+.thumbs .drop button{
+  position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;
+  background:var(--ink);color:var(--bg);border:0;font-size:13px;line-height:1;cursor:pointer;
+}
+.proposal{
+  margin-top:10px;border:1px solid var(--acc);border-radius:var(--radius-sm);
+  background:var(--acc-soft);padding:11px;
+}
+.proposal h4{margin:0 0 3px;font-size:13.5px;font-weight:640;color:var(--ink)}
+.proposal p.lead{margin:0 0 9px;font-size:12.5px;color:var(--ink-2)}
+.prop-item{display:flex;gap:9px;align-items:flex-start;padding:6px 0;font-size:13px}
+.prop-item + .prop-item{border-top:1px dashed var(--line)}
+.prop-item input{margin-top:3px;flex:0 0 auto;width:16px;height:16px;accent-color:var(--acc)}
+.prop-item label{margin:0;font-size:13px;color:var(--ink);font-weight:400;flex:1}
+.prop-item b{font-weight:600}
+.prop-unsure{
+  margin-top:9px;font-size:12.5px;color:var(--caution);
+  background:var(--caution-bg);border:1px solid var(--caution-line);
+  padding:7px 9px;border-radius:7px;
+}
+.speak{
+  background:none;border:1px solid var(--line);border-radius:7px;
+  padding:5px 9px;font-size:12px;color:var(--ink-2);cursor:pointer;
+}
+.speak.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.asks{margin:6px 0 0;padding-left:16px;font-size:12.5px;color:var(--ink-3)}
+.asks li{margin:1px 0}
+
+
+/* ---- guided mode: one thing on screen at a time ---- */
+.wiz{
+  position:fixed;inset:0;z-index:100;background:var(--bg);
+  display:none;flex-direction:column;
+}
+.wiz.on{display:flex}
+.wiz-top{
+  padding:calc(12px + env(safe-area-inset-top)) 16px 10px;
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.wiz-top .meta{flex:1}
+.wiz-close{background:none;border:0;color:var(--ink-3);font-size:22px;cursor:pointer;padding:2px 8px}
+.wiz-prog{height:4px;background:var(--line)}
+.wiz-prog i{display:block;height:100%;background:var(--acc);transition:width .25s}
+.wiz-body{
+  flex:1;overflow-y:auto;padding:22px 18px;
+  max-width:640px;width:100%;margin:0 auto;
+}
+.wiz-q{font-size:22px;font-weight:650;letter-spacing:-.4px;line-height:1.25;margin:0 0 6px}
+.wiz-sub{font-size:14.5px;color:var(--ink-2);margin:0 0 18px;line-height:1.45}
+.wiz-foot{
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);
+  display:flex;gap:10px;background:var(--card);
+}
+.wiz-foot .btn{flex:1}
+.wiz-body .asks{font-size:13.5px;color:var(--ink-2);margin:0 0 14px}
+.wiz-body textarea{min-height:88px;font-size:16px}
+.wiz-body .tags{margin-top:12px}
+.wiz-one-fact{margin-top:6px}
+.wiz-one-fact .fact-a{display:flex;gap:8px;margin-top:16px}
+.wiz-one-fact .fact-a button{flex:1;padding:13px 8px;font-size:14px;border-radius:var(--radius-sm)}
+.wiz-skip{background:none;border:0;color:var(--ink-3);font-size:13px;cursor:pointer;text-decoration:underline;margin-top:14px}
+
 details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0}
 </style>
 </head>
@@ -266,6 +345,12 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
 <section class="view on" id="v-prep">
   <h2>Plan of attack</h2>
   <p class="sub">Fixed order. Observe first, interpret after — the sequence is the point.</p>
+
+  <div class="card" style="border-color:var(--acc)">
+    <h3>Guided prep</h3>
+    <p class="hint">One thing on screen at a time. It only asks what it still needs.</p>
+    <button class="btn wide" id="startWiz">Start guided prep</button>
+  </div>
 
   <!-- 1 focus -->
   <div class="step" id="step1">
@@ -313,7 +398,8 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
     <div class="step-n">4</div>
     <div class="card">
       <h3>Structural facts</h3>
-      <p class="hint">Yes or no. These decide which edges can exist today.</p>
+      <p class="hint">These, and the L/S/B tags above, are what the board actually computes from. Your written notes feed them via "Read this view" — they aren't read directly.</p>
+      <button class="cap-btn plain" type="button" id="readAll" style="margin-bottom:10px">Read every view I've shot</button>
       <div id="facts"></div>
     </div>
   </div>
@@ -425,6 +511,20 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
 
 </main>
 
+<div class="wiz" id="wiz" role="dialog" aria-modal="true">
+  <div class="wiz-top">
+    <div class="meta" id="wizWhere"></div>
+    <button class="speak" id="wizSay" type="button">Read aloud</button>
+    <button class="wiz-close" id="wizClose" aria-label="Close">×</button>
+  </div>
+  <div class="wiz-prog"><i id="wizProg"></i></div>
+  <div class="wiz-body" id="wizBody"></div>
+  <div class="wiz-foot">
+    <button class="btn ghost" id="wizBack">Back</button>
+    <button class="btn" id="wizNext">Next</button>
+  </div>
+</div>
+
 <nav>
   <button data-go="prep" aria-current="page"><span class="ico">◷</span>Prep<span class="dot"></span></button>
   <button data-go="board"><span class="ico">▤</span>Board<span class="dot"></span></button>
@@ -507,12 +607,18 @@ var FOCUS_OPTIONS = [
 ];
 
 var VIEWS = [
-  { id:"overnight", name:"Overnight session", note:"Range in points, what happened, character" },
-  { id:"rth",       name:"Recent RTH action", note:"Gaps, acceptance, give-back" },
-  { id:"micro",     name:"Micro composite",   note:"Overlapping value areas, composite VAH/VAL/POC" },
-  { id:"composite", name:"Composite profile", note:"Significant HVNs and LVNs" },
-  { id:"monthly",   name:"Monthly",           note:"Position against value, direction" },
-  { id:"weekly",    name:"Weekly",            note:"Position against value, direction" }
+  { id:"overnight", name:"Overnight session", note:"Globex, before the cash open",
+    asks:["Range high, low and size in points","Where it opened, and the overnight POC","Muted, directional or balanced"] },
+  { id:"rth",       name:"Recent cash session", note:"US regular hours, 14:30–21:00 UK",
+    asks:["Yesterday's high, low, VWAP and POC","Did it gap, and did the gap hold or fill","Accepted higher or lower, or gave it back"] },
+  { id:"micro",     name:"Micro composite",   note:"The last few sessions together",
+    asks:["Do the recent value areas overlap, or is each stacked away from the last","Composite VAH, VAL and POC if there is one","Which way the short-term auction is leaning"] },
+  { id:"composite", name:"Composite profile", note:"The wider balance you're trading inside",
+    asks:["The HVNs that price keeps returning to","The LVNs between them — your decision lines","Which of those is nearest to price now"] },
+  { id:"monthly",   name:"Monthly",           note:"Where the month sits",
+    asks:["Above, below or inside monthly value","Direction of the monthly auction"] },
+  { id:"weekly",    name:"Weekly",            note:"Where the week sits",
+    asks:["Above, below or inside weekly value","Direction of the weekly auction"] }
 ];
 
 /* Structural facts. Each one exists because at least one edge rule
@@ -792,19 +898,68 @@ function renderViews(){
     var d = day();
     d.views[v.id] = d.views[v.id] || {};
     var row = el("div","view-row");
+    row.id = "vr-" + v.id;
+
     var name = el("div","view-name");
     name.appendChild(el("span", null, v.name));
     name.appendChild(el("em", null, v.note));
     row.appendChild(name);
 
+    /* say plainly what this box wants — no guessing at 6am */
+    var asks = el("ul","asks");
+    v.asks.forEach(function(a){ asks.appendChild(el("li", null, a)); });
+    row.appendChild(asks);
+
     var ta = el("textarea");
-    ta.placeholder = "What you see";
+    ta.placeholder = "Type it, dictate it with the mic on your keyboard, or shoot the chart below";
     ta.value = d.views[v.id].note || "";
     ta.oninput = function(){ d.views[v.id].note = ta.value; save(); };
     ta.style.marginTop = "8px";
     row.appendChild(ta);
 
-    var tags = el("div","tags"); tags.style.marginTop = "8px";
+    /* ---- capture row: this is now the main way in ---- */
+    var cap = el("div","cap-row");
+
+    var shoot = el("label","cap-btn");
+    shoot.appendChild(document.createTextNode("Shoot the chart"));
+    var file = el("input"); file.type = "file"; file.accept = "image/*";
+    file.multiple = true; file.style.display = "none";
+    file.onchange = function(){ addShots(v.id, file.files); file.value = ""; };
+    shoot.appendChild(file);
+    cap.appendChild(shoot);
+
+    var read = el("button","cap-btn plain");
+    read.type = "button";
+    read.textContent = "Read this view";
+    read.onclick = function(){ analyseView(v.id, read); };
+    cap.appendChild(read);
+
+    var say = el("button","speak");
+    say.type = "button"; say.textContent = "Read aloud";
+    say.onclick = function(){ speak(v.name + ". " + (d.views[v.id].note || "Nothing noted yet.")); };
+    cap.appendChild(say);
+
+    row.appendChild(cap);
+
+    /* thumbnails of anything shot for this view */
+    var shots = SHOTS[v.id] || [];
+    if(shots.length){
+      var th = el("div","thumbs");
+      shots.forEach(function(s, i){
+        var d2 = el("div","drop");
+        var img = el("img"); img.src = s.url; img.alt = "chart";
+        var x = el("button", null, "×");
+        x.onclick = function(){ shots.splice(i,1); renderViews(); };
+        d2.appendChild(img); d2.appendChild(x);
+        th.appendChild(d2);
+      });
+      row.appendChild(th);
+    }
+
+    /* pending proposal from Claude, waiting on your confirmation */
+    if(PROPOSALS[v.id]) row.appendChild(proposalBox(v.id));
+
+    var tags = el("div","tags"); tags.style.marginTop = "10px";
     [["L","Longs"],["S","Shorts"],["B","Balanced"]].forEach(function(t){
       var b = el("button","tag", t[0] + " · " + t[1]);
       b.type = "button";
@@ -818,6 +973,185 @@ function renderViews(){
     row.appendChild(tags);
     wrap.appendChild(row);
   });
+}
+
+/* ---------------------------------------------------------------
+   Chart capture. Images are held in memory for the session only —
+   they're big, and localStorage fills at about a dozen of them.
+----------------------------------------------------------------*/
+var SHOTS = {};
+var PROPOSALS = {};
+
+function addShots(viewId, files){
+  SHOTS[viewId] = SHOTS[viewId] || [];
+  var list = Array.prototype.slice.call(files || []);
+  var pending = list.length;
+  if(!pending) return;
+  list.forEach(function(f){
+    var r = new FileReader();
+    r.onload = function(){
+      SHOTS[viewId].push({
+        url: r.result,
+        b64: String(r.result).split(",")[1],
+        type: f.type || "image/jpeg"
+      });
+      if(--pending === 0){ renderViews(); toast("Shot added — tap Read this view"); }
+    };
+    r.onerror = function(){ if(--pending === 0) renderViews(); };
+    r.readAsDataURL(f);
+  });
+}
+
+/* Facts the model is allowed to propose, with their permitted answers.
+   Kept explicit so it can't invent an answer the engine doesn't understand. */
+function factMenu(){
+  return FACTS.map(function(f){ return f.id + ": " + f.a.join("|"); }).join("\n");
+}
+
+async function analyseView(viewId, btn){
+  var v = VIEWS.filter(function(x){ return x.id === viewId; })[0];
+  var d = day();
+  var shots = SHOTS[viewId] || [];
+  var note = (d.views[viewId] || {}).note || "";
+
+  if(!shots.length && !note.trim()){
+    toast("Shoot the chart or write a line first");
+    return;
+  }
+  if(btn){ btn.disabled = true; btn.textContent = "Reading…"; }
+
+  var content = [];
+  shots.forEach(function(s){
+    content.push({ type:"image", source:{ type:"base64", media_type:s.type, data:s.b64 } });
+  });
+  content.push({ type:"text", text:
+    "This is the '" + v.name + "' view of my pre-market prep for micro E-mini S&P futures (mES), " +
+    "using Auction Market Theory and volume profile.\n\n" +
+    (note ? "My own notes on this view:\n" + note + "\n\n" : "") +
+    (shots.length ? "Charts attached.\n\n" : "") +
+    "For this view I am trying to establish:\n- " + v.asks.join("\n- ") + "\n\n" +
+    "Return ONLY this JSON, no prose and no code fences:\n" +
+    '{"note":"one tidy line summarising this view, keeping every price I gave you",' +
+    '"tag":"L|S|B|",' +
+    '"levels":{"pdVah":"","pdVal":"","pdPoc":"","nPoc":"","onHigh":"","onLow":""},' +
+    '"facts":{},' +
+    '"unsure":["anything you could not read confidently"]}\n\n' +
+    "Rules: only fill a level or a fact you can actually support from what I gave you — " +
+    "leave it out rather than guessing, and list the guess in 'unsure' instead. " +
+    "Never read a price off a pixel position; only use printed numbers or numbers I typed.\n\n" +
+    "Permitted facts and their only permitted answers:\n" + factMenu()
+  });
+
+  try{
+    var text = await callClaudeRaw([{ role:"user", content:content }],
+      "You read volume profile charts for a discretionary futures trader. " +
+      "You are precise and you never invent a price. You reply with JSON only.");
+    var clean = text.replace(/```json|```/g, "").trim();
+    var p = JSON.parse(clean);
+    PROPOSALS[viewId] = p;
+    renderViews();
+    var vr = $("vr-" + viewId); if(vr) vr.scrollIntoView({block:"center", behavior:"smooth"});
+  }catch(e){
+    toast(e.message === "no-key" ? "Add your API key in Settings"
+        : e.message === "bad-key" ? "That key was rejected — check Settings"
+        : "Couldn't read that one — " + e.message.slice(0,60));
+  }
+  if(btn){ btn.disabled = false; btn.textContent = "Read this view"; }
+}
+
+/* Nothing lands without you agreeing to it. */
+function proposalBox(viewId){
+  var p = PROPOSALS[viewId];
+  var box = el("div","proposal");
+  box.appendChild(el("h4", null, "What Claude read"));
+  box.appendChild(el("p","lead", "Untick anything wrong. Nothing is saved until you apply it."));
+
+  var items = [];
+
+  if(p.note){
+    items.push({ kind:"note", label:"Note: " + p.note, val:p.note });
+  }
+  if(p.tag && ["L","S","B"].indexOf(p.tag) > -1){
+    var tagName = { L:"Longs in control", S:"Shorts in control", B:"Balanced" }[p.tag];
+    items.push({ kind:"tag", label:"Tag: " + tagName, val:p.tag });
+  }
+  Object.keys(p.levels || {}).forEach(function(k){
+    var val = p.levels[k];
+    if(!val) return;
+    var name = (LEVELS.filter(function(l){ return l.id === k; })[0] || {}).name || k;
+    items.push({ kind:"level", label:name + ": " + val, val:val, key:k });
+  });
+  Object.keys(p.facts || {}).forEach(function(k){
+    var f = FACTS.filter(function(x){ return x.id === k; })[0];
+    if(!f) return;
+    var val = p.facts[k];
+    if(f.a.indexOf(val) < 0) return;      /* refuse an answer the engine can't use */
+    items.push({ kind:"fact", label:f.q + "  →  " + val, val:val, key:k });
+  });
+
+  if(!items.length){
+    box.appendChild(el("p","lead","Nothing readable came back. Fill it in by hand."));
+  }
+
+  items.forEach(function(it, i){
+    var row = el("div","prop-item");
+    var cb = el("input"); cb.type = "checkbox"; cb.checked = true;
+    cb.id = "prop-" + viewId + "-" + i;
+    it.box = cb;
+    var lab = el("label", null, it.label);
+    lab.setAttribute("for", cb.id);
+    row.appendChild(cb); row.appendChild(lab);
+    box.appendChild(row);
+  });
+
+  if((p.unsure || []).length){
+    box.appendChild(el("div","prop-unsure",
+      "Couldn't read confidently: " + p.unsure.join("; ") + ". Check these yourself."));
+  }
+
+  var row = el("div","cap-row");
+  var apply = el("button","cap-btn"); apply.type = "button"; apply.textContent = "Apply";
+  apply.onclick = function(){
+    var d = day(), n = 0;
+    items.forEach(function(it){
+      if(!it.box.checked) return;
+      n++;
+      if(it.kind === "note")  d.views[viewId].note = it.val;
+      if(it.kind === "tag")   d.views[viewId].tag  = it.val;
+      if(it.kind === "level") d.levels[it.key]     = it.val;
+      if(it.kind === "fact")  d.facts[it.key]      = it.val;
+    });
+    delete PROPOSALS[viewId];
+    save();
+    renderViews(); renderFacts(); renderLevels(); renderSteps(); renderHeader(); renderBoard();
+    toast(n + (n === 1 ? " thing applied" : " things applied"));
+  };
+  var drop = el("button","cap-btn plain"); drop.type = "button"; drop.textContent = "Discard";
+  drop.onclick = function(){ delete PROPOSALS[viewId]; renderViews(); };
+  var say = el("button","speak"); say.type = "button"; say.textContent = "Read aloud";
+  say.onclick = function(){
+    speak("Claude read: " + (p.note || "") + ". " +
+      items.filter(function(i){ return i.kind === "fact"; })
+           .map(function(i){ return i.label; }).join(". "));
+  };
+  row.appendChild(apply); row.appendChild(drop); row.appendChild(say);
+  box.appendChild(row);
+  return box;
+}
+
+/* ---------------------------------------------------------------
+   Speech. Reading works reliably on iPhone; dictation comes from
+   the keyboard mic, which is Apple's engine and works everywhere.
+----------------------------------------------------------------*/
+function speak(text){
+  if(!("speechSynthesis" in window)){ toast("This device can't read aloud"); return; }
+  if(speechSynthesis.speaking){ speechSynthesis.cancel(); return; }
+  var u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.02; u.pitch = 1;
+  var vs = speechSynthesis.getVoices();
+  var uk = vs.filter(function(v){ return /en-GB/i.test(v.lang); })[0];
+  if(uk) u.voice = uk;
+  speechSynthesis.speak(u);
 }
 
 function renderFacts(){
@@ -887,6 +1221,19 @@ function renderBoard(){
 
   var v = verdicts();
   var onCount = EDGES.filter(function(x){ return v[x.id].status === "on"; }).length;
+
+  var say = el("button","speak");
+  say.type = "button"; say.textContent = "Read the board aloud";
+  say.style.marginBottom = "12px";
+  say.onclick = function(){
+    var lines = EDGES.map(function(e){
+      var r = v[e.id];
+      return e.name + " is " + (r.status === "on" ? "on" : r.status === "caution" ? "on caution" : "off") +
+        ". " + r.why.join(". ") + ".";
+    });
+    speak("Today's board. " + lines.join(" "));
+  };
+  out.appendChild(say);
   sub.textContent = onCount === 0
     ? "Nothing is on today. That's a valid answer."
     : onCount + (onCount === 1 ? " edge is on today." : " edges are on today.");
@@ -1015,13 +1362,17 @@ function renderIdeas(){
    directly, so the model fetches and we confirm what it found.
 ===================================================================== */
 async function callClaude(system, user, opts){
+  return callClaudeRaw([{ role:"user", content:user }], system, opts);
+}
+
+async function callClaudeRaw(messages, system, opts){
   opts = opts || {};
   if(!S.apiKey) throw new Error("no-key");
   var body = {
     model: "claude-sonnet-4-6",
-    max_tokens: 1000,
+    max_tokens: 1500,
     system: system,
-    messages: [{ role:"user", content:user }]
+    messages: messages
   };
   if(opts.search) body.tools = [{ type:"web_search_20250305", name:"web_search" }];
 
@@ -1046,10 +1397,7 @@ async function callClaude(system, user, opts){
     .filter(Boolean).join("\n");
 }
 
-async function pullNews(){
-  var btn = $("pullNews");
-  btn.disabled = true; btn.textContent = "Looking…";
-  try{
+async function pullNewsCore(){
     var d = new Date();
     var when = new Intl.DateTimeFormat("en-GB",
       {weekday:"long", day:"numeric", month:"long", year:"numeric"}).format(d);
@@ -1073,6 +1421,13 @@ async function pullNews(){
       save(); renderNews(); renderSteps();
       toast("Found " + evs.length + " — check them before you rely on them");
     }
+}
+
+async function pullNews(){
+  var btn = $("pullNews");
+  btn.disabled = true; btn.textContent = "Looking…";
+  try{
+    await pullNewsCore();
   }catch(e){
     toast(e.message === "no-key" ? "Add your API key in Settings"
         : e.message === "bad-key" ? "That key was rejected — check Settings"
@@ -1108,6 +1463,22 @@ $("extraLevels").oninput = function(){ day().extraLevels = this.value; save(); r
 $("analysis").oninput = function(){ day().analysis = this.value; save(); renderSteps(); renderHeader(); };
 
 $("pullNews").onclick = pullNews;
+
+$("readAll").onclick = async function(){
+  var btn = this;
+  var todo = VIEWS.filter(function(v){
+    return (SHOTS[v.id] || []).length || ((day().views[v.id] || {}).note || "").trim();
+  });
+  if(!todo.length){ toast("Shoot a chart or write a note first"); return; }
+  btn.disabled = true;
+  for(var i = 0; i < todo.length; i++){
+    btn.textContent = "Reading " + (i+1) + " of " + todo.length + "…";
+    await analyseView(todo[i].id, null);
+  }
+  btn.disabled = false;
+  btn.textContent = "Read every view I've shot";
+  toast("Done — check each proposal before applying");
+};
 $("addNews").onclick = function(){
   var t = $("newsTime").value.trim(), w = $("newsWhat").value.trim();
   if(!w){ toast("What's the event?"); return; }
@@ -1183,6 +1554,330 @@ $("newDay").onclick = function(){
     delete S.days[S.currentDay];
   }
   day(); save(); renderAll(); go("prep"); toast("New day — focus carried over");
+};
+
+
+/* =====================================================================
+   Guided prep. The same data, one decision at a time.
+   Steps are built fresh each run so it only asks what's still missing.
+===================================================================== */
+var WIZ = { steps: [], i: 0 };
+
+function wizStepFocus(){
+  return {
+    say: "What is today's focus? One performance objective, not P and L.",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","What's today's focus?"));
+      box.appendChild(el("p","wiz-sub","One performance objective. Not P&L. Yesterday's carries over unless you change it."));
+      var chips = el("div","chips");
+      FOCUS_OPTIONS.forEach(function(t){
+        var b = el("button","chip",t); b.type = "button";
+        b.setAttribute("aria-pressed", day().focus === t ? "true" : "false");
+        b.onclick = function(){
+          day().focus = (day().focus === t) ? "" : t;
+          save(); wizRerender();
+        };
+        chips.appendChild(b);
+      });
+      box.appendChild(chips);
+      var inp = el("input"); inp.type = "text";
+      inp.placeholder = "Or write your own";
+      inp.style.marginTop = "14px";
+      inp.value = day().focusFree || "";
+      inp.oninput = function(){ day().focusFree = inp.value; save(); };
+      box.appendChild(inp);
+    },
+    ready: function(){ return !!(day().focus || day().focusFree); },
+    need: "Pick a focus or write one"
+  };
+}
+
+function wizStepNews(){
+  return {
+    say: "News. Pull today's calendar, or skip it if you already know the day.",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Anything on the calendar?"));
+      box.appendChild(el("p","wiz-sub","High-impact events that could move the auction. Pull them, or add what you already know."));
+      var pull = el("button","btn wide", null); pull.textContent = "Pull today's events"; pull.type = "button";
+      pull.onclick = async function(){
+        pull.disabled = true; pull.textContent = "Looking…";
+        try{ await pullNewsCore(); }catch(e){}
+        pull.disabled = false; pull.textContent = "Pull today's events";
+        wizRerender();
+      };
+      box.appendChild(pull);
+      var list = day().news || [];
+      list.forEach(function(n, idx){
+        var row = el("div","idea");
+        var h = el("div","idea-h");
+        h.appendChild(el("b", null, n.time + "  " + n.what));
+        var x = el("button","x","×");
+        x.onclick = function(){ list.splice(idx,1); save(); wizRerender(); };
+        h.appendChild(x); row.appendChild(h);
+        box.appendChild(row);
+      });
+      var r2 = el("div","row-2"); r2.style.marginTop = "12px";
+      var t = el("input"); t.type = "text"; t.placeholder = "14:30"; t.className = "price";
+      var w = el("input"); w.type = "text"; w.placeholder = "Event";
+      r2.appendChild(t); r2.appendChild(w); box.appendChild(r2);
+      var add = el("button","cap-btn plain"); add.type = "button"; add.textContent = "Add event";
+      add.style.marginTop = "8px";
+      add.onclick = function(){
+        if(!w.value.trim()) return;
+        day().news.push({ time:t.value.trim() || "—", what:w.value.trim(), impact:"" });
+        save(); wizRerender();
+      };
+      box.appendChild(add);
+    },
+    ready: function(){ return true; },   /* a quiet day is a valid answer */
+    need: ""
+  };
+}
+
+function wizStepView(v){
+  return {
+    say: v.name + ". " + v.asks.join(". "),
+    render: function(box){
+      var d = day(); d.views[v.id] = d.views[v.id] || {};
+      box.appendChild(el("h2","wiz-q", v.name));
+      box.appendChild(el("p","wiz-sub", v.note + ". Shoot the chart and let Claude read it, or say it in your own words with the keyboard mic."));
+      var asks = el("ul","asks");
+      v.asks.forEach(function(a){ asks.appendChild(el("li", null, a)); });
+      box.appendChild(asks);
+
+      var cap = el("div","cap-row");
+      var shoot = el("label","cap-btn");
+      shoot.appendChild(document.createTextNode("Shoot the chart"));
+      var file = el("input"); file.type = "file"; file.accept = "image/*"; file.multiple = true;
+      file.style.display = "none";
+      file.onchange = function(){ addShots(v.id, file.files); file.value = ""; setTimeout(wizRerender, 400); };
+      shoot.appendChild(file); cap.appendChild(shoot);
+
+      var read = el("button","cap-btn"); read.type = "button"; read.textContent = "Ask Claude to read it";
+      read.onclick = async function(){
+        read.disabled = true; read.textContent = "Reading…";
+        await analyseView(v.id, null);
+        read.disabled = false; read.textContent = "Ask Claude to read it";
+        wizRerender();
+      };
+      cap.appendChild(read);
+      box.appendChild(cap);
+
+      var shots = SHOTS[v.id] || [];
+      if(shots.length){
+        var th = el("div","thumbs");
+        shots.forEach(function(s, i){
+          var d2 = el("div","drop");
+          var img = el("img"); img.src = s.url;
+          var x = el("button", null, "×");
+          x.onclick = function(){ shots.splice(i,1); wizRerender(); };
+          d2.appendChild(img); d2.appendChild(x); th.appendChild(d2);
+        });
+        box.appendChild(th);
+      }
+
+      var ta = el("textarea");
+      ta.placeholder = "What you see, in your own words";
+      ta.style.marginTop = "12px";
+      ta.value = d.views[v.id].note || "";
+      ta.oninput = function(){ d.views[v.id].note = ta.value; save(); };
+      box.appendChild(ta);
+
+      if(PROPOSALS[v.id]) box.appendChild(proposalBox(v.id));
+
+      box.appendChild(el("p","wiz-sub", "Who's in control on this view?")).style.marginTop = "16px";
+      var tags = el("div","tags");
+      [["L","Longs"],["S","Shorts"],["B","Balanced"]].forEach(function(t){
+        var b = el("button","tag", t[0] + " · " + t[1]); b.type = "button";
+        b.setAttribute("aria-pressed", d.views[v.id].tag === t[0] ? "true" : "false");
+        b.onclick = function(){
+          d.views[v.id].tag = (d.views[v.id].tag === t[0]) ? "" : t[0];
+          save(); wizRerender();
+        };
+        tags.appendChild(b);
+      });
+      box.appendChild(tags);
+    },
+    ready: function(){ return !!(day().views[v.id] || {}).tag; },
+    need: "Tag who's in control before moving on"
+  };
+}
+
+function wizStepFact(f){
+  return {
+    _factId: f.id,
+    say: f.q,
+    render: function(box){
+      var wrap = el("div","wiz-one-fact");
+      wrap.appendChild(el("h2","wiz-q", f.q));
+      wrap.appendChild(el("p","wiz-sub","Still needed — Claude couldn't settle this one from your charts."));
+      var ans = el("div","fact-a");
+      f.a.forEach(function(a){
+        var b = el("button", null, a); b.type = "button";
+        b.setAttribute("aria-pressed", day().facts[f.id] === a ? "true" : "false");
+        b.onclick = function(){
+          day().facts[f.id] = a; save();
+          setTimeout(wizNext, 150);   /* answer advances — one decision, done */
+        };
+        ans.appendChild(b);
+      });
+      wrap.appendChild(ans);
+      var skip = el("button","wiz-skip","Not sure — skip it");
+      skip.type = "button";
+      skip.onclick = function(){ wizNext(); };
+      wrap.appendChild(skip);
+      box.appendChild(wrap);
+    },
+    ready: function(){ return true; },
+    need: ""
+  };
+}
+
+function wizStepLevels(){
+  return {
+    say: "Levels. Fill in any key prices Claude didn't pick up.",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Key levels"));
+      box.appendChild(el("p","wiz-sub","Anything Claude read is already here. Zones, not lines — two points either side."));
+      var grid = el("div","levels-grid");
+      LEVELS.forEach(function(l){
+        var b2 = el("div");
+        var lab = el("label", null, l.name);
+        var inp = el("input"); inp.type = "text"; inp.className = "price"; inp.placeholder = "0000.00";
+        inp.value = day().levels[l.id] || "";
+        inp.oninput = function(){ day().levels[l.id] = inp.value; save(); };
+        b2.appendChild(lab); b2.appendChild(inp); grid.appendChild(b2);
+      });
+      box.appendChild(grid);
+      var lab = el("label", null, "Other levels in play");
+      lab.style.marginTop = "12px";
+      var ta = el("textarea");
+      ta.value = day().extraLevels || "";
+      ta.oninput = function(){ day().extraLevels = ta.value; save(); };
+      box.appendChild(lab); box.appendChild(ta);
+    },
+    ready: function(){ return true; },
+    need: ""
+  };
+}
+
+function wizStepAnalysis(){
+  return {
+    say: "Last one. Your read of the day, in a few lines.",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Your read of the day"));
+      box.appendChild(el("p","wiz-sub","Now you interpret. A few lines — what kind of day is this shaping up to be?"));
+      var ta = el("textarea");
+      ta.style.minHeight = "120px";
+      ta.value = day().analysis || "";
+      ta.oninput = function(){ day().analysis = ta.value; save(); };
+      box.appendChild(ta);
+    },
+    ready: function(){ return !!day().analysis; },
+    need: "A line or two — then the board opens"
+  };
+}
+
+function wizStepBoard(){
+  return {
+    say: "",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Today's board"));
+      renderBoard();
+      var clone = $("boardOut").cloneNode(true);
+      clone.querySelectorAll("button").forEach(function(b){ b.remove(); });
+      box.appendChild(clone);
+      var say = el("button","btn wide"); say.type = "button";
+      say.textContent = "Read the board aloud"; say.style.marginTop = "6px";
+      say.onclick = function(){
+        var v = verdicts();
+        speak("Today's board. " + EDGES.map(function(e){
+          var r = v[e.id];
+          return e.name + " is " + (r.status === "on" ? "on" : r.status === "caution" ? "on caution" : "off") + ".";
+        }).join(" "));
+      };
+      box.appendChild(say);
+    },
+    ready: function(){ return true; },
+    need: ""
+  };
+}
+
+function buildWiz(){
+  var steps = [ wizStepFocus(), wizStepNews() ];
+  VIEWS.forEach(function(v){ steps.push(wizStepView(v)); });
+  /* only the facts nothing else has answered — think about what's needed now */
+  FACTS.forEach(function(f){
+    if(!day().facts[f.id]) steps.push(wizStepFact(f));
+  });
+  steps.push(wizStepLevels());
+  steps.push(wizStepAnalysis());
+  steps.push(wizStepBoard());
+  return steps;
+}
+
+function openWiz(){
+  WIZ.steps = buildWiz();
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+}
+function closeWiz(){
+  $("wiz").classList.remove("on");
+  document.body.style.overflow = "";
+  speechSynthesis && speechSynthesis.cancel && speechSynthesis.cancel();
+  renderAll();
+}
+function wizRender(){
+  var s = WIZ.steps[WIZ.i];
+  $("wizWhere").textContent = "STEP " + (WIZ.i + 1) + " OF " + WIZ.steps.length;
+  $("wizProg").style.width = Math.round((WIZ.i) / (WIZ.steps.length - 1) * 100) + "%";
+  var body = $("wizBody"); body.innerHTML = "";
+  s.render(body);
+  body.scrollTop = 0;
+  $("wizBack").style.visibility = WIZ.i === 0 ? "hidden" : "visible";
+  $("wizNext").textContent = WIZ.i === WIZ.steps.length - 1 ? "Done" : "Next";
+}
+function wizRerender(){
+  var keep = $("wizBody").scrollTop;
+  var s = WIZ.steps[WIZ.i];
+  var body = $("wizBody"); body.innerHTML = "";
+  s.render(body);
+  body.scrollTop = keep;
+}
+function wizNext(){
+  var s = WIZ.steps[WIZ.i];
+  if(!s.ready()){ toast(s.need); return; }
+  if(WIZ.i >= WIZ.steps.length - 1){ closeWiz(); return; }
+  /* facts answered along the way drop out of what's left */
+  if(WIZ.i + 1 < WIZ.steps.length){
+    WIZ.steps = WIZ.steps.slice(0, WIZ.i + 1).concat(
+      rebuildRemaining(WIZ.i + 1)
+    );
+  }
+  WIZ.i++;
+  wizRender();
+}
+function rebuildRemaining(from){
+  /* keep future view/one-off steps, but re-filter fact steps against
+     what's now answered so Claude's reads shrink the questionnaire */
+  var rest = WIZ.steps.slice(from);
+  return rest.filter(function(st){
+    return !(st._factId && day().facts[st._factId]);
+  });
+}
+function wizBack(){
+  if(WIZ.i > 0){ WIZ.i--; wizRender(); }
+}
+
+$("startWiz").onclick = openWiz;
+$("wizClose").onclick = closeWiz;
+$("wizNext").onclick = wizNext;
+$("wizBack").onclick = wizBack;
+$("wizSay").onclick = function(){
+  var s = WIZ.steps[WIZ.i];
+  if(s && s.say) speak(s.say);
 };
 
 function renderAll(){
