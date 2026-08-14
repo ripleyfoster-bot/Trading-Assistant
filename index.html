@@ -337,6 +337,56 @@ nav .ico{font-size:17px;line-height:1}
 .chat-input .btn{align-self:flex-end}
 .msg.think{align-self:flex-start;color:var(--ink-3);font-size:13px;background:none;border:0}
 
+
+/* ---- header flip clocks ---- */
+.h-row{flex-wrap:wrap}
+.clocks{display:flex;gap:16px;align-items:center;margin:0 auto}
+.clock{text-align:center}
+.clock .digits{display:flex;gap:3px;align-items:center}
+.flip{
+  background:linear-gradient(180deg,var(--card-2) 48%,var(--card) 52%);
+  border:1px solid var(--line);border-radius:6px;padding:4px 5px;
+  font:650 15px/1 var(--f-data);letter-spacing:1px;position:relative;
+  box-shadow:var(--shadow);min-width:26px;text-align:center;
+}
+.flip::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line);opacity:.8}
+.clock .col{font:650 13px/1 var(--f-data);color:var(--ink-3)}
+.clock .lab{font:650 9px/1 var(--f-body);letter-spacing:1.4px;color:var(--ink-3);margin-top:4px}
+@media(max-width:560px){
+  .flip{font-size:12px;padding:3px 4px;min-width:22px}
+  .clocks{gap:10px}
+}
+
+/* ---- desktop: sidebar + persistent coach split ---- */
+@media(min-width:1000px){
+  nav{
+    position:fixed;left:0;top:0;bottom:0;right:auto;width:150px;
+    display:flex;flex-direction:column;gap:4px;
+    padding:calc(var(--hdr-h,96px) + 10px) 8px 14px;
+    border-top:0;border-right:1px solid var(--line);
+  }
+  nav button{
+    flex-direction:row;justify-content:flex-start;gap:9px;
+    font-size:13px;padding:10px 11px;border-radius:9px;
+  }
+  nav button[aria-current="page"]{background:var(--acc-soft)}
+  nav button .dot{display:none}
+  nav button[data-go="coach"]{margin-top:auto}
+  header{padding-left:166px;z-index:50}
+  main{margin:0 40% 0 150px;max-width:none;padding:16px 24px}
+  body{padding-bottom:24px}
+  #v-coach{
+    display:flex !important;flex-direction:column;
+    position:fixed;right:0;top:var(--hdr-h,96px);bottom:0;width:40%;
+    overflow-y:auto;border-left:1px solid var(--line);
+    background:var(--bg);padding:16px 18px;margin:0;
+  }
+  #v-coach .chat{flex:1;overflow-y:auto}
+  #v-coach .chat-input{position:sticky;bottom:0;background:var(--bg);padding-top:6px}
+  body.coach-full main{display:none}
+  body.coach-full #v-coach{width:calc(100% - 150px)}
+}
+
 details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0}
 </style>
 </head>
@@ -345,6 +395,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
 <header>
   <div class="h-row">
     <h1>Trading Assistant</h1>
+    <div class="clocks" id="clocks"></div>
     <span class="h-date" id="hdrDate"></span>
   </div>
   <div class="prog"><i id="hdrProg"></i></div>
@@ -494,7 +545,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
 <!-- ============================ SETTINGS ============================ -->
 <section class="view" id="v-set">
   <h2>Settings</h2>
-  <p class="sub">Stage one: prep and the permission board. Risk, journal and coach come next.</p>
+  <p class="sub">Prep, board, ideas and coach are live. Risk engine, journal and review come next.</p>
 
   <div class="card">
     <h3>Appearance</h3>
@@ -562,8 +613,8 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <button data-go="prep" aria-current="page"><span class="ico">◷</span>Prep<span class="dot"></span></button>
   <button data-go="board"><span class="ico">▤</span>Board<span class="dot"></span></button>
   <button data-go="plan"><span class="ico">◎</span>Ideas<span class="dot"></span></button>
-  <button data-go="coach"><span class="ico">✳</span>Coach<span class="dot"></span></button>
   <button data-go="set"><span class="ico">⚙</span>Settings<span class="dot"></span></button>
+  <button data-go="coach"><span class="ico">✳</span>Coach<span class="dot"></span></button>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -1439,7 +1490,10 @@ async function pullNewsCore(){
       "You return only JSON. No preamble, no markdown fences.",
       "Find today's US economic calendar events for " + when + ", the ones that move equity index " +
       "futures. Check Financial Juice and Trading Economics. Return JSON: " +
-      '{"events":[{"time":"HH:MM UK time","what":"event name","impact":"high|medium|low"}]} ' +
+      '{"events":[{"time":"HH:MM","what":"event name","impact":"high|medium|low"}]} ' +
+      "CRITICAL: every time must be expressed in UK local time (Europe/London), 24-hour clock. " +
+      "Financial Juice already shows UK times — use them as-is. If a source shows US Eastern, " +
+      "convert it to UK before returning (usually add five hours). " +
       "High impact only, maximum 5. If nothing significant, return an empty array.",
       { search:true }
     );
@@ -1473,14 +1527,28 @@ async function pullNews(){
 /* =====================================================================
    Wiring
 ===================================================================== */
-function go(name){
-  ["prep","board","plan","coach","set"].forEach(function(v){
-    $("v-" + v).classList.toggle("on", v === name);
-  });
+var CURRENT = "prep";
+function isDesktop(){ return window.matchMedia("(min-width:1000px)").matches; }
+function syncNav(name){
   document.querySelectorAll("nav button").forEach(function(b){
     if(b.dataset.go === name) b.setAttribute("aria-current","page");
     else b.removeAttribute("aria-current");
   });
+}
+function go(name){
+  if(isDesktop() && name === "coach"){
+    /* coach lives on the right already — the button just expands it */
+    var full = document.body.classList.toggle("coach-full");
+    renderCoach();
+    syncNav(full ? "coach" : CURRENT);
+    return;
+  }
+  if(isDesktop()) document.body.classList.remove("coach-full");
+  CURRENT = name;
+  ["prep","board","plan","coach","set"].forEach(function(v){
+    $("v-" + v).classList.toggle("on", v === name);
+  });
+  syncNav(name);
   if(name === "board") renderBoard();
   if(name === "plan"){ renderIdeaEdges(); renderIdeas(); }
   if(name === "coach") renderCoach();
@@ -1674,7 +1742,12 @@ function wizStepNews(){
       var pull = el("button","btn wide", null); pull.textContent = "Pull today's events"; pull.type = "button";
       pull.onclick = async function(){
         pull.disabled = true; pull.textContent = "Looking…";
-        try{ await pullNewsCore(); }catch(e){}
+        try{ await pullNewsCore(); }
+        catch(e){
+          toast(e.message === "no-key" ? "Add your API key in Settings"
+              : e.message === "bad-key" ? "Key rejected — check Settings"
+              : "Couldn't pull events: " + e.message.slice(0,70));
+        }
         pull.disabled = false; pull.textContent = "Pull today's events";
         wizRerender();
       };
@@ -1974,12 +2047,20 @@ var METHOD_BRIEF =
   "Risk principles: stop distance set by structure then size derived from it, minimum 1:1, any single trade is 50/50, the edge lives in the sample, no revenge trading, small consistent wins over big days. " +
   "Voice: direct, mechanical, no fluff, British English, short answers a trader can absorb between glances at a chart. " +
   "Push back in the method's own terms when he reaches for a trade the day does not support. " +
+  "TIMEZONE RULE: every time in this app — his prep, the news list, his messages — is UK local time (Europe/London) unless he says otherwise. " +
+  "New York is normally five hours behind the UK. The US cash open is 14:30 UK, so for example 13:30 UK is 08:30 in New York, an hour before the open. " +
+  "Never reinterpret a UK time as US Eastern. " +
   "You are not connected to live market data — never state current prices; work only from what he tells you and today's prep. " +
   "Nothing you say is financial advice and he makes his own decisions — do not repeat this; it is context, not a disclaimer to recite.";
 
 function dayContext(){
   var d = day(), out = [];
   out.push("Date: " + (S.currentDay || todayKey()));
+  var fmt = function(tz){
+    return new Intl.DateTimeFormat("en-GB",
+      { hour:"2-digit", minute:"2-digit", hour12:false, timeZone:tz }).format(new Date());
+  };
+  out.push("Time now: " + fmt("Europe/London") + " UK (" + fmt("America/New_York") + " New York). All times below are UK local.");
   if(d.focus || d.focusFree) out.push("Focus: " + (d.focus || d.focusFree));
   var tags = VIEWS.map(function(v){
     var t = (d.views[v.id] || {}).tag;
@@ -2087,13 +2168,53 @@ $("chatIn").addEventListener("keydown", function(ev){
   }
 });
 
+
+/* ---- one clock face, two timezones. UK is the app's clock;
+       New York is context, and never the one your times are read in. */
+function buildClocks(){
+  var c = $("clocks");
+  if(!c || c.dataset.built) return;
+  c.dataset.built = "1";
+  [["ckL","LOCAL"],["ckN","NEW YORK"]].forEach(function(k){
+    var box = el("div","clock");
+    var d = el("div","digits");
+    ["h","m","s"].forEach(function(p, i){
+      if(i) d.appendChild(el("span","col",":"));
+      var f = el("span","flip","00"); f.id = k[0] + "-" + p;
+      d.appendChild(f);
+    });
+    box.appendChild(d);
+    box.appendChild(el("div","lab", k[1]));
+    c.appendChild(box);
+  });
+}
+function setClock(prefix, tz){
+  var parts = new Intl.DateTimeFormat("en-GB",
+    { hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false, timeZone:tz })
+    .format(new Date()).split(":");
+  var h = $(prefix + "-h"), m = $(prefix + "-m"), s = $(prefix + "-s");
+  if(h){ h.textContent = parts[0]; m.textContent = parts[1]; s.textContent = parts[2]; }
+}
+function tickClocks(){
+  setClock("ckL", "Europe/London");
+  setClock("ckN", "America/New_York");
+}
+function measureHeader(){
+  var h = document.querySelector("header");
+  if(h) document.documentElement.style.setProperty("--hdr-h", h.offsetHeight + "px");
+}
+window.addEventListener("resize", measureHeader);
+
 function renderAll(){
   day();
   applyTheme(); dstCheck(); renderHeader();
   renderFocus(); renderNews(); renderViews(); renderFacts();
   renderLevels(); renderSteps(); renderSettings();
   renderBoard(); renderIdeaEdges(); renderIdeas();
+  renderCoach();
+  buildClocks(); tickClocks(); measureHeader();
 }
+setInterval(tickClocks, 1000);
 
 window.matchMedia("(prefers-color-scheme: dark)")
   .addEventListener("change", function(){ if(S.mode === "auto") applyTheme(); });
