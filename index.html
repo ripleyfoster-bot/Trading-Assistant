@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12161b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Trading Assistant</title>
+<style>
+/* ---------------------------------------------------------------
+   Theme tokens. Five presets to match the 12 Week Year and meal
+   planner apps, plus light / dark / auto.
+   Status colours are deliberately NOT themed — a permission signal
+   must mean the same thing whatever palette is running.
+----------------------------------------------------------------*/
+:root{
+  --ok:#2e7d4f; --ok-bg:#e6f4ec; --ok-line:#9dcbb2;
+  --caution:#9a6800; --caution-bg:#fdf3dd; --caution-line:#e0bd6a;
+  --off:#8a3a3a; --off-bg:#f7e9e9; --off-line:#d7a9a9;
+  --radius:14px; --radius-sm:9px;
+  --gap:14px;
+  --f-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --f-data:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+[data-mode="dark"]{
+  --bg:#12161b; --card:#1a2027; --card-2:#212933; --line:#2c3540;
+  --ink:#e8edf2; --ink-2:#a3b0bd; --ink-3:#6f7d8b;
+  --ok:#5fbd88; --ok-bg:#16301f; --ok-line:#2c5a3c;
+  --caution:#e0b055; --caution-bg:#332813; --caution-line:#5e4a1d;
+  --off:#dd8484; --off-bg:#331a1a; --off-line:#5c2e2e;
+  --shadow:0 1px 2px rgba(0,0,0,.5);
+}
+[data-mode="light"]{
+  --bg:#f2f4f6; --card:#ffffff; --card-2:#f7f9fa; --line:#dde3e8;
+  --ink:#161c22; --ink-2:#5a6773; --ink-3:#8b98a5;
+  --shadow:0 1px 2px rgba(16,24,32,.07);
+}
+[data-accent="graphite"]{ --acc:#4b6478; --acc-ink:#fff; --acc-soft:#e7edf2; }
+[data-accent="clay"]    { --acc:#a35a3c; --acc-ink:#fff; --acc-soft:#f6e9e3; }
+[data-accent="pine"]    { --acc:#2f6b52; --acc-ink:#fff; --acc-soft:#e4f0ea; }
+[data-accent="indigo"]  { --acc:#4a4f9c; --acc-ink:#fff; --acc-soft:#e9e9f6; }
+[data-accent="ember"]   { --acc:#a8492c; --acc-ink:#fff; --acc-soft:#f8e7e1; }
+[data-mode="dark"][data-accent="graphite"]{ --acc:#7fa0ba; --acc-ink:#0e141a; --acc-soft:#1d2831; }
+[data-mode="dark"][data-accent="clay"]    { --acc:#d4886a; --acc-ink:#20120c; --acc-soft:#2e1e17; }
+[data-mode="dark"][data-accent="pine"]    { --acc:#5fae8c; --acc-ink:#0b1a14; --acc-soft:#15271f; }
+[data-mode="dark"][data-accent="indigo"]  { --acc:#8a90e0; --acc-ink:#0f1020; --acc-soft:#1e1f33; }
+[data-mode="dark"][data-accent="ember"]   { --acc:#e07a55; --acc-ink:#1e0d07; --acc-soft:#301810; }
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:400 16px/1.45 var(--f-body);
+  -webkit-text-size-adjust:100%;
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));
+}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* header */
+header{
+  position:sticky;top:0;z-index:30;background:var(--bg);
+  padding:calc(10px + env(safe-area-inset-top)) 16px 8px;
+  border-bottom:1px solid var(--line);
+}
+.h-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+h1{margin:0;font-size:17px;font-weight:650;letter-spacing:-.2px}
+.h-date{font:500 12px/1 var(--f-data);color:var(--ink-3);letter-spacing:.4px}
+.banner{
+  margin-top:8px;padding:8px 11px;border-radius:var(--radius-sm);
+  background:var(--caution-bg);border:1px solid var(--caution-line);
+  color:var(--caution);font-size:13px;line-height:1.35;
+}
+
+/* layout */
+main{padding:16px;max-width:900px;margin:0 auto}
+.view{display:none}
+.view.on{display:block}
+h2{margin:0 0 4px;font-size:20px;font-weight:640;letter-spacing:-.3px}
+.sub{margin:0 0 16px;color:var(--ink-2);font-size:14px}
+
+.card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:14px;margin-bottom:var(--gap);
+  box-shadow:var(--shadow);
+}
+.card h3{margin:0 0 2px;font-size:15px;font-weight:620}
+.card .hint{margin:0 0 10px;font-size:13px;color:var(--ink-2)}
+
+/* the step spine — order carries meaning here, prep is a fixed sequence */
+.step{display:flex;gap:12px;margin-bottom:var(--gap)}
+.step-n{
+  flex:0 0 26px;height:26px;border-radius:50%;margin-top:13px;
+  display:grid;place-items:center;
+  font:600 12px/1 var(--f-data);
+  background:var(--card-2);border:1px solid var(--line);color:var(--ink-3);
+}
+.step.done .step-n{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.step .card{flex:1;margin-bottom:0}
+
+label{display:block;font-size:13px;font-weight:560;color:var(--ink-2);margin:10px 0 5px}
+input[type=text],input[type=number],textarea,select{
+  width:100%;padding:9px 11px;background:var(--card-2);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+}
+textarea{min-height:64px;resize:vertical}
+input[type=text].price{font-family:var(--f-data)}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{
+  padding:7px 12px;border-radius:999px;background:var(--card-2);
+  border:1px solid var(--line);color:var(--ink-2);
+  font-size:13px;cursor:pointer;
+}
+.chip[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:560}
+.chip.sm{padding:5px 10px;font-size:12px}
+
+.tags{display:flex;gap:6px}
+.tag{
+  flex:1;padding:8px 0;text-align:center;border-radius:var(--radius-sm);
+  background:var(--card-2);border:1px solid var(--line);
+  font:600 13px/1 var(--f-data);color:var(--ink-3);cursor:pointer;
+}
+.tag[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+
+.view-row{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.view-row:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.view-name{font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.view-name em{font-style:normal;font:500 11px/1 var(--f-data);color:var(--ink-3);letter-spacing:.5px}
+
+.fact{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0}
+.fact + .fact{border-top:1px dashed var(--line)}
+.fact-q{font-size:13.5px;flex:1}
+.fact-a{display:flex;gap:5px;flex:0 0 auto}
+.fact-a button{
+  padding:5px 9px;border-radius:7px;background:var(--card-2);
+  border:1px solid var(--line);color:var(--ink-3);
+  font:600 11px/1 var(--f-data);cursor:pointer;letter-spacing:.3px;
+}
+.fact-a button[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+
+/* ---- signature: the permission board ---------------------------
+   Six edges, each a card that states its own verdict and why.
+   This is the thing the app is for, so it gets the boldness.     */
+.board{display:grid;gap:10px}
+@media(min-width:620px){.board{grid-template-columns:1fr 1fr}}
+.edge{
+  border-radius:var(--radius);padding:13px 14px;border:1px solid var(--line);
+  background:var(--card);position:relative;overflow:hidden;
+}
+.edge::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--ink-3)}
+.edge.s-on::before{background:var(--ok)}
+.edge.s-caution::before{background:var(--caution)}
+.edge.s-off::before{background:var(--off)}
+.edge-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.edge-name{font-size:15px;font-weight:640;letter-spacing:-.2px}
+.edge-short{font:600 11px/1 var(--f-data);color:var(--ink-3);letter-spacing:.6px}
+.verdict{
+  font:700 11px/1 var(--f-data);letter-spacing:.9px;
+  padding:5px 9px;border-radius:6px;white-space:nowrap;
+}
+.s-on .verdict{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-line)}
+.s-caution .verdict{background:var(--caution-bg);color:var(--caution);border:1px solid var(--caution-line)}
+.s-off .verdict{background:var(--off-bg);color:var(--off);border:1px solid var(--off-line)}
+.edge-why{margin:9px 0 0;padding:0 0 0 16px;font-size:13px;color:var(--ink-2)}
+.edge-why li{margin:2px 0}
+.edge-cost{
+  margin-top:9px;padding:8px 10px;border-radius:var(--radius-sm);
+  background:var(--caution-bg);border:1px solid var(--caution-line);
+  color:var(--caution);font-size:12.5px;line-height:1.35;
+}
+.edge-locked{
+  margin-top:9px;font-size:12.5px;color:var(--ink-3);font-style:italic;
+}
+.edge-ovr{margin-top:9px;display:flex;gap:7px;align-items:center}
+.edge-ovr button{
+  padding:6px 10px;border-radius:7px;background:transparent;
+  border:1px solid var(--line);color:var(--ink-2);font-size:12px;cursor:pointer;
+}
+.ovr-note{
+  margin-top:8px;font-size:12.5px;color:var(--ink-2);
+  padding:8px 10px;background:var(--card-2);border-radius:var(--radius-sm);
+  border-left:3px solid var(--acc);
+}
+
+.empty{
+  text-align:center;padding:28px 18px;color:var(--ink-2);
+  border:1px dashed var(--line);border-radius:var(--radius);background:var(--card-2);
+}
+.empty strong{display:block;color:var(--ink);font-size:15px;margin-bottom:5px}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:11px 16px;border-radius:var(--radius-sm);cursor:pointer;
+  background:var(--acc);border:1px solid var(--acc);color:var(--acc-ink);
+  font-size:15px;font-weight:580;
+}
+.btn.ghost{background:transparent;border-color:var(--line);color:var(--ink-2)}
+.btn.wide{width:100%}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+.idea{
+  background:var(--card-2);border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:11px;margin-bottom:9px;
+}
+.idea-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.idea-h b{font-size:14px}
+.idea-legs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+.idea-legs div{font:500 13px/1.3 var(--f-data)}
+.idea-legs span{display:block;font:500 10px/1 var(--f-body);color:var(--ink-3);letter-spacing:.5px;margin-bottom:3px}
+.x{background:none;border:0;color:var(--ink-3);font-size:19px;line-height:1;cursor:pointer;padding:0 4px}
+
+.levels-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.levels-grid label{margin-top:4px}
+
+/* tab bar */
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;
+  display:grid;grid-template-columns:repeat(4,1fr);
+  background:var(--card);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{
+  background:none;border:0;padding:9px 4px 10px;cursor:pointer;
+  color:var(--ink-3);font-size:11px;font-weight:560;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+nav button .dot{width:5px;height:5px;border-radius:50%;background:transparent}
+nav button[aria-current="page"]{color:var(--acc)}
+nav button[aria-current="page"] .dot{background:var(--acc)}
+nav .ico{font-size:17px;line-height:1}
+
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;
+  background:var(--ink);color:var(--bg);padding:10px 15px;
+  border-radius:999px;font-size:13.5px;max-width:88%;text-align:center;
+  opacity:0;pointer-events:none;transition:opacity .18s;
+}
+.toast.show{opacity:.96}
+
+.prog{height:4px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:9px}
+.prog i{display:block;height:100%;background:var(--acc);width:0;transition:width .25s}
+.meta{font:500 11px/1 var(--f-data);color:var(--ink-3);letter-spacing:.4px}
+.row-2{display:flex;gap:9px}
+.row-2 > *{flex:1}
+details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-row">
+    <h1>Trading Assistant</h1>
+    <span class="h-date" id="hdrDate"></span>
+  </div>
+  <div class="prog"><i id="hdrProg"></i></div>
+  <div id="dstBanner"></div>
+</header>
+
+<main>
+
+<!-- ============================ PREP ============================ -->
+<section class="view on" id="v-prep">
+  <h2>Plan of attack</h2>
+  <p class="sub">Fixed order. Observe first, interpret after — the sequence is the point.</p>
+
+  <!-- 1 focus -->
+  <div class="step" id="step1">
+    <div class="step-n">1</div>
+    <div class="card">
+      <h3>Today's focus</h3>
+      <p class="hint">One performance objective. Not P&amp;L.</p>
+      <div class="chips" id="focusChips"></div>
+      <label for="focusFree">Or write your own</label>
+      <input type="text" id="focusFree" placeholder="e.g. wait for the level, don't anticipate">
+    </div>
+  </div>
+
+  <!-- 2 news -->
+  <div class="step" id="step2">
+    <div class="step-n">2</div>
+    <div class="card">
+      <h3>News events</h3>
+      <p class="hint">What's on the calendar that could move the auction.</p>
+      <button class="btn ghost wide" id="pullNews">Pull today's events</button>
+      <div id="newsOut"></div>
+      <details style="margin-top:10px">
+        <summary>Add one by hand</summary>
+        <div class="row-2" style="margin-top:8px">
+          <input type="text" id="newsTime" placeholder="14:30" class="price">
+          <input type="text" id="newsWhat" placeholder="CPI">
+        </div>
+        <button class="btn ghost wide" id="addNews" style="margin-top:8px">Add event</button>
+      </details>
+    </div>
+  </div>
+
+  <!-- 3 observations -->
+  <div class="step" id="step3">
+    <div class="step-n">3</div>
+    <div class="card">
+      <h3>Timeframe observations</h3>
+      <p class="hint">Six views, in order. Note what you see and tag who's in control. No trade ideas yet.</p>
+      <div id="views"></div>
+    </div>
+  </div>
+
+  <!-- 4 facts -->
+  <div class="step" id="step4">
+    <div class="step-n">4</div>
+    <div class="card">
+      <h3>Structural facts</h3>
+      <p class="hint">Yes or no. These decide which edges can exist today.</p>
+      <div id="facts"></div>
+    </div>
+  </div>
+
+  <!-- 5 levels -->
+  <div class="step" id="step5">
+    <div class="step-n">5</div>
+    <div class="card">
+      <h3>Levels</h3>
+      <p class="hint">Zones, not lines. Roughly two points either side on mES.</p>
+      <div class="levels-grid" id="levels"></div>
+      <label for="extraLevels">Other levels in play</label>
+      <textarea id="extraLevels" placeholder="Composite HVNs / LVNs, weekly value edges, overnight high and low…"></textarea>
+    </div>
+  </div>
+
+  <!-- 6 analysis -->
+  <div class="step" id="step6">
+    <div class="step-n">6</div>
+    <div class="card">
+      <h3>General analysis</h3>
+      <p class="hint">Now you can interpret. What do you make of all that?</p>
+      <textarea id="analysis" placeholder="Your read of the day…" style="min-height:96px"></textarea>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ BOARD ============================ -->
+<section class="view" id="v-board">
+  <h2>Edge permission</h2>
+  <p class="sub" id="boardSub">What the day allows.</p>
+  <div id="boardOut"></div>
+</section>
+
+<!-- ============================ PLAN ============================ -->
+<section class="view" id="v-plan">
+  <h2>Trade ideas</h2>
+  <p class="sub">Only edges the day permits. Idea, stop, entry — all three or no trade.</p>
+  <div class="card">
+    <label for="ideaEdge">Edge</label>
+    <select id="ideaEdge"></select>
+    <div class="row-2" style="margin-top:4px">
+      <div>
+        <label for="ideaDir">Direction</label>
+        <select id="ideaDir"><option>Long</option><option>Short</option></select>
+      </div>
+      <div>
+        <label for="ideaEntry">Entry zone</label>
+        <input type="text" id="ideaEntry" class="price" placeholder="6412–6414">
+      </div>
+    </div>
+    <div class="row-2">
+      <div>
+        <label for="ideaStop">Stop zone</label>
+        <input type="text" id="ideaStop" class="price" placeholder="beyond 6406">
+      </div>
+      <div>
+        <label for="ideaTarget">Target</label>
+        <input type="text" id="ideaTarget" class="price" placeholder="POC 6431">
+      </div>
+    </div>
+    <label for="ideaNote">Note</label>
+    <input type="text" id="ideaNote" placeholder="Why this one, in a line">
+    <button class="btn wide" id="addIdea" style="margin-top:12px">Add idea</button>
+  </div>
+  <div id="ideasOut"></div>
+</section>
+
+<!-- ============================ SETTINGS ============================ -->
+<section class="view" id="v-set">
+  <h2>Settings</h2>
+  <p class="sub">Stage one: prep and the permission board. Risk, journal and coach come next.</p>
+
+  <div class="card">
+    <h3>Appearance</h3>
+    <p class="hint">Same palettes as your other apps.</p>
+    <label>Mode</label>
+    <div class="chips" id="modeChips"></div>
+    <label>Colour</label>
+    <div class="chips" id="accChips"></div>
+  </div>
+
+  <div class="card">
+    <h3>Session</h3>
+    <label for="pmStart">Afternoon starts (UK)</label>
+    <input type="text" id="pmStart" class="price" placeholder="17:30">
+    <p class="hint" style="margin-top:6px">Afternoon Delight stays shut before this.</p>
+    <label for="openTime">Cash open (UK)</label>
+    <input type="text" id="openTime" class="price" placeholder="14:30">
+  </div>
+
+  <div class="card">
+    <h3>Claude API key</h3>
+    <p class="hint">Kept on this device only. Used to pull the calendar and, later, to coach.</p>
+    <input type="text" id="apiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+    <div class="row-2" style="margin-top:10px">
+      <button class="btn ghost" id="testKey">Test connection</button>
+      <button class="btn ghost" id="saveKey">Save key</button>
+    </div>
+    <div id="keyOut" style="margin-top:9px;font-size:13px;color:var(--ink-2)"></div>
+  </div>
+
+  <div class="card">
+    <h3>Day</h3>
+    <p class="hint">Prep is stored per day. Starting a new day keeps yesterday's focus.</p>
+    <button class="btn ghost wide" id="newDay">Start a new trading day</button>
+  </div>
+</section>
+
+</main>
+
+<nav>
+  <button data-go="prep" aria-current="page"><span class="ico">◷</span>Prep<span class="dot"></span></button>
+  <button data-go="board"><span class="ico">▤</span>Board<span class="dot"></span></button>
+  <button data-go="plan"><span class="ico">◎</span>Ideas<span class="dot"></span></button>
+  <button data-go="set"><span class="ico">⚙</span>Settings<span class="dot"></span></button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   Storage. Everything lives on this device. Prep is keyed by day so
+   yesterday's read never quietly becomes today's.
+===================================================================== */
+var KEY = "ta_wpa_1";
+var S = load();
+
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    if(raw) return migrate(JSON.parse(raw));
+  }catch(e){}
+  return migrate({});
+}
+function migrate(s){
+  s.mode = s.mode || "auto";
+  s.accent = s.accent || "graphite";
+  s.pmStart = s.pmStart || "17:30";
+  s.openTime = s.openTime || "14:30";
+  s.apiKey = s.apiKey || "";
+  s.days = s.days || {};
+  return s;
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch(e){ toast("Couldn't save — device storage is full"); }
+}
+
+function todayKey(){
+  var d = new Date();
+  return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+}
+function pad(n){ return (n<10?"0":"") + n; }
+
+function day(){
+  var k = S.currentDay || todayKey();
+  S.currentDay = k;
+  if(!S.days[k]){
+    var prev = lastDay();
+    S.days[k] = {
+      focus: prev ? prev.focus : "",       /* focus carries over, by design */
+      focusFree: prev ? prev.focusFree : "",
+      news: [],
+      views: {}, facts: {}, levels: {},
+      extraLevels: "", analysis: "",
+      ideas: [], overrides: {}
+    };
+  }
+  return S.days[k];
+}
+function lastDay(){
+  var keys = Object.keys(S.days).sort();
+  if(!keys.length) return null;
+  return S.days[keys[keys.length-1]];
+}
+
+/* =====================================================================
+   Content model
+===================================================================== */
+var FOCUS_OPTIONS = [
+  "Patience — wait for the level",
+  "No revenge trades",
+  "Hold winners to target",
+  "Size discipline",
+  "Stick to the permitted edge",
+  "No trade without an idea",
+  "Journal every trade"
+];
+
+var VIEWS = [
+  { id:"overnight", name:"Overnight session", note:"Range in points, what happened, character" },
+  { id:"rth",       name:"Recent RTH action", note:"Gaps, acceptance, give-back" },
+  { id:"micro",     name:"Micro composite",   note:"Overlapping value areas, composite VAH/VAL/POC" },
+  { id:"composite", name:"Composite profile", note:"Significant HVNs and LVNs" },
+  { id:"monthly",   name:"Monthly",           note:"Position against value, direction" },
+  { id:"weekly",    name:"Weekly",            note:"Position against value, direction" }
+];
+
+/* Structural facts. Each one exists because at least one edge rule
+   needs it — nothing here is asked for the sake of asking. */
+var FACTS = [
+  { id:"priorBalanced",  q:"Prior day balanced (not strongly directional)?", a:["Yes","No"] },
+  { id:"insideValue",    q:"Opened inside prior value?",                      a:["Yes","No"] },
+  { id:"nakedPoc",       q:"Prior POC still naked (untagged)?",               a:["Yes","No"] },
+  { id:"trendDay",       q:"Trend day developing?",                           a:["Yes","No","Early"] },
+  { id:"pullback",       q:"Pullback into value available?",                  a:["Yes","No","Early"] },
+  { id:"choppyVwap",     q:"Chopping around VWAP?",                           a:["Yes","No"] },
+  { id:"edgeFailed",     q:"Value-area extreme already failed repeatedly?",   a:["Yes","No"] },
+  { id:"hvnDefined",     q:"Composite HVNs clearly defined?",                 a:["Yes","No"] },
+  { id:"lvnClear",       q:"Decision LVN clear?",                             a:["Yes","No"] },
+  { id:"accepting",      q:"Price accepting through the decision level?",     a:["Yes","No"] },
+  { id:"secondDist",     q:"Second distribution formed?",                     a:["Yes","No","Forming"] },
+  { id:"pocShifting",    q:"Developing POC shifting rapidly?",                a:["Yes","No"] },
+  { id:"overlapping",    q:"Short-term value areas overlapping?",             a:["Yes","No"] },
+  { id:"compositeWide",  q:"Micro composite too wide to define risk?",        a:["Yes","No"] },
+  { id:"mcBias",         q:"Micro composite bias?",                           a:["Clear","Tentative","None"] },
+  { id:"deepPullback",   q:"Deep afternoon pullback into the midpoint holding?", a:["Yes","No","Early"] },
+  { id:"midAccepted",    q:"Midpoint being accepted through?",                a:["Yes","No"] },
+  { id:"exhausted",      q:"Trend exhausted into major support/resistance?",  a:["Yes","No"] }
+];
+
+var LEVELS = [
+  { id:"pdVah", name:"Prior VAH" }, { id:"pdVal", name:"Prior VAL" },
+  { id:"pdPoc", name:"Prior POC" }, { id:"nPoc",  name:"Naked POC" },
+  { id:"onHigh",name:"Overnight high" }, { id:"onLow", name:"Overnight low" }
+];
+
+var EDGES = [
+  { id:"flow", name:"Go With The Flow",  short:"FLOW" },
+  { id:"sand", name:"Line in the Sand",  short:"SAND" },
+  { id:"ntb",  name:"Naked Tractor Beam",short:"NTB"  },
+  { id:"dd",   name:"Playing with DDs",  short:"DD"   },
+  { id:"ad",   name:"Afternoon Delight", short:"AD"   },
+  { id:"mcf",  name:"MC Flow",           short:"MCF"  }
+];
+
+/* =====================================================================
+   The environment engine.
+
+   Two tiers, and the difference is structural possibility, not taste:
+     OFF     — the setup cannot exist today. No door.
+     CAUTION — it exists, the context doesn't back it. Minimum size,
+               and you type a reason first.
+===================================================================== */
+function htfBias(){
+  var d = day();
+  var m = (d.views.monthly||{}).tag, w = (d.views.weekly||{}).tag;
+  if(!m || !w) return "unknown";
+  var dir = function(t){ return t==="L" ? 1 : t==="S" ? -1 : 0; };
+  var a = dir(m), b = dir(w);
+  if(a && b && a === b) return "aligned";
+  if(a && b && a !== b) return "conflicted";
+  if(a || b) return "weak";
+  return "balanced";
+}
+
+function isAfternoon(){
+  var now = new Date();
+  var parts = (S.pmStart || "17:30").split(":");
+  var cut = new Date(now); cut.setHours(+parts[0]||17, +parts[1]||30, 0, 0);
+  return now >= cut;
+}
+
+function verdicts(){
+  var f = day().facts, bias = htfBias(), out = {};
+  var is = function(id, v){ return f[id] === v; };
+  var unknown = function(id){ return !f[id]; };
+
+  /* --- Go With The Flow ------------------------------------------ */
+  (function(){
+    var off = [], caution = [], on = [];
+    if(bias === "conflicted") off.push("Higher timeframes are conflicted");
+    if(bias === "balanced")   off.push("No higher-timeframe direction to follow");
+    if(is("choppyVwap","Yes")) off.push("Chopping around VWAP");
+    if(is("edgeFailed","Yes")) off.push("Value-area extreme has already failed repeatedly");
+    if(!off.length){
+      if(bias === "weak") caution.push("Higher-timeframe bias is only partial");
+      if(is("pullback","No")) caution.push("No pullback into value on offer yet");
+      if(is("pullback","Early")) caution.push("Too early to know if a pullback comes");
+      if(bias === "aligned" && is("pullback","Yes")) on.push("Aligned higher-timeframe bias with a pullback to value");
+    }
+    out.flow = decide(off, caution, on, ["monthly","weekly"]);
+  })();
+
+  /* --- Line in the Sand ------------------------------------------ */
+  (function(){
+    var off = [], caution = [], on = [];
+    if(is("lvnClear","No"))   off.push("No clear LVN to use as the line");
+    if(is("accepting","Yes")) off.push("Price is accepting through the level, not rejecting it");
+    if(!off.length){
+      if(is("hvnDefined","No")) caution.push("Composite HVNs aren't cleanly defined");
+      if(is("hvnDefined","Yes") && is("lvnClear","Yes")) on.push("Clean rotation between defined HVNs with a clear LVN between");
+    }
+    out.sand = decide(off, caution, on, []);
+  })();
+
+  /* --- Naked Tractor Beam ---------------------------------------- */
+  (function(){
+    var off = [], caution = [], on = [];
+    if(is("nakedPoc","No")) off.push("No naked POC — it's been tagged, so the setup doesn't exist");
+    if(!off.length){
+      if(is("priorBalanced","No")) caution.push("Prior day was directional, not balanced");
+      if(is("insideValue","No"))   caution.push("Didn't open inside prior value");
+      if(is("nakedPoc","Yes") && is("priorBalanced","Yes") && is("insideValue","Yes"))
+        on.push("Balanced prior day, inside-value open, POC still naked");
+    }
+    out.ntb = decide(off, caution, on, []);
+  })();
+
+  /* --- Playing with DDs ------------------------------------------ */
+  (function(){
+    var off = [], caution = [], on = [];
+    if(is("secondDist","No"))   off.push("No second distribution — there's nothing to trade between");
+    if(is("pocShifting","Yes")) off.push("Developing POC is shifting too fast to target");
+    if(is("lvnClear","No"))     off.push("Separating LVN isn't clear");
+    if(!off.length){
+      if(is("secondDist","Forming")) caution.push("Second distribution is forming but not confirmed");
+      if(is("secondDist","Yes") && is("lvnClear","Yes") && is("pocShifting","No"))
+        on.push("Confirmed second distribution with a clear separating LVN");
+    }
+    out.dd = decide(off, caution, on, []);
+  })();
+
+  /* --- Afternoon Delight ----------------------------------------- */
+  (function(){
+    var off = [], caution = [], on = [];
+    if(!isAfternoon())         off.push("It's not the afternoon yet — this one is time-gated");
+    if(is("trendDay","No"))    off.push("Not a trend day");
+    if(is("midAccepted","Yes"))off.push("Midpoint is being accepted through");
+    if(is("exhausted","Yes"))  off.push("Trend has exhausted into major support or resistance");
+    if(!off.length){
+      if(is("trendDay","Early"))     caution.push("Trend day not confirmed yet");
+      if(is("deepPullback","No"))    caution.push("Pullback isn't deep enough into the midpoint");
+      if(is("deepPullback","Early")) caution.push("Waiting on the afternoon pullback");
+      if(is("trendDay","Yes") && is("deepPullback","Yes"))
+        on.push("Confirmed trend day with a deep pullback holding the midpoint");
+    }
+    out.ad = decide(off, caution, on, []);
+  })();
+
+  /* --- MC Flow ---------------------------------------------------- */
+  (function(){
+    var off = [], caution = [], on = [];
+    if(is("overlapping","No"))    off.push("Value areas aren't overlapping — no composite to read");
+    if(is("compositeWide","Yes")) off.push("Composite is too wide to define risk");
+    if(is("mcBias","None"))       off.push("No directional bias in the composite");
+    if(!off.length){
+      if(is("mcBias","Tentative")) caution.push("Composite bias is tentative");
+      if(is("overlapping","Yes") && is("mcBias","Clear"))
+        on.push("Clear micro composite with a directional bias");
+    }
+    out.mcf = decide(off, caution, on, []);
+  })();
+
+  return out;
+
+  function decide(off, caution, on, needTags){
+    if(off.length) return { status:"off", why:off, hard:true };
+    var missing = needTags.filter(function(v){ return !(day().views[v]||{}).tag; });
+    if(caution.length) return { status:"caution", why:caution };
+    if(on.length)      return { status:"on", why:on };
+    return { status:"caution", why:["Not enough of the day read yet to call this on"], thin:true };
+  }
+}
+
+function factsAnswered(){
+  var f = day().facts, n = 0;
+  FACTS.forEach(function(x){ if(f[x.id]) n++; });
+  return n;
+}
+function prepComplete(){
+  var d = day();
+  var tagged = VIEWS.filter(function(v){ return (d.views[v.id]||{}).tag; }).length;
+  return !!(d.focus || d.focusFree) && tagged === VIEWS.length && factsAnswered() >= 10;
+}
+function prepPercent(){
+  var d = day(), got = 0, total = 4;
+  if(d.focus || d.focusFree) got++;
+  got += VIEWS.filter(function(v){ return (d.views[v.id]||{}).tag; }).length / VIEWS.length;
+  got += Math.min(1, factsAnswered() / 10);
+  if(d.analysis) got++;
+  return Math.round(got / total * 100);
+}
+
+/* =====================================================================
+   Render
+===================================================================== */
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){
+  var n = document.createElement(tag);
+  if(cls) n.className = cls;
+  if(txt != null) n.textContent = txt;
+  return n;
+}
+var toastT;
+function toast(msg){
+  var t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(function(){ t.classList.remove("show"); }, 2400);
+}
+
+function applyTheme(){
+  var mode = S.mode;
+  if(mode === "auto"){
+    mode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  document.documentElement.setAttribute("data-mode", mode);
+  document.documentElement.setAttribute("data-accent", S.accent);
+  document.querySelector('meta[name=theme-color]')
+    .setAttribute("content", mode === "dark" ? "#12161b" : "#f2f4f6");
+}
+
+/* The UK/US offset drifts for a few weeks each spring and autumn.
+   That's when people turn up an hour early or late, so say so. */
+function dstCheck(){
+  var box = $("dstBanner"); box.innerHTML = "";
+  var now = new Date();
+  var hourIn = function(tz){
+    return +new Intl.DateTimeFormat("en-GB", {timeZone:tz, hour:"numeric", hour12:false}).format(now);
+  };
+  var diff = (hourIn("Europe/London") - hourIn("America/New_York") + 24) % 24;
+  if(diff !== 5){
+    var b = el("div","banner",
+      "London is " + diff + " hours ahead of New York today, not the usual 5. The cash open moves — check the clock before you sit down.");
+    box.appendChild(b);
+  }
+}
+
+function renderHeader(){
+  var d = new Date(S.currentDay || todayKey());
+  $("hdrDate").textContent = new Intl.DateTimeFormat("en-GB",
+    {weekday:"short", day:"numeric", month:"short"}).format(d).toUpperCase();
+  $("hdrProg").style.width = prepPercent() + "%";
+}
+
+function renderFocus(){
+  var wrap = $("focusChips"); wrap.innerHTML = "";
+  FOCUS_OPTIONS.forEach(function(t){
+    var b = el("button","chip",t);
+    b.type = "button";
+    b.setAttribute("aria-pressed", day().focus === t ? "true" : "false");
+    b.onclick = function(){
+      day().focus = (day().focus === t) ? "" : t;
+      save(); renderFocus(); renderSteps(); renderHeader();
+    };
+    wrap.appendChild(b);
+  });
+  $("focusFree").value = day().focusFree || "";
+}
+
+function renderNews(){
+  var out = $("newsOut"); out.innerHTML = "";
+  var list = day().news || [];
+  if(!list.length){
+    out.appendChild(el("p","hint","Nothing logged yet."));
+    return;
+  }
+  list.forEach(function(n, i){
+    var row = el("div","idea");
+    var h = el("div","idea-h");
+    h.appendChild(el("b", null, n.time + "  " + n.what));
+    var x = el("button","x","×");
+    x.onclick = function(){ list.splice(i,1); save(); renderNews(); };
+    h.appendChild(x);
+    row.appendChild(h);
+    if(n.impact) row.appendChild(el("div","meta", n.impact.toUpperCase()));
+    out.appendChild(row);
+  });
+}
+
+function renderViews(){
+  var wrap = $("views"); wrap.innerHTML = "";
+  VIEWS.forEach(function(v){
+    var d = day();
+    d.views[v.id] = d.views[v.id] || {};
+    var row = el("div","view-row");
+    var name = el("div","view-name");
+    name.appendChild(el("span", null, v.name));
+    name.appendChild(el("em", null, v.note));
+    row.appendChild(name);
+
+    var ta = el("textarea");
+    ta.placeholder = "What you see";
+    ta.value = d.views[v.id].note || "";
+    ta.oninput = function(){ d.views[v.id].note = ta.value; save(); };
+    ta.style.marginTop = "8px";
+    row.appendChild(ta);
+
+    var tags = el("div","tags"); tags.style.marginTop = "8px";
+    [["L","Longs"],["S","Shorts"],["B","Balanced"]].forEach(function(t){
+      var b = el("button","tag", t[0] + " · " + t[1]);
+      b.type = "button";
+      b.setAttribute("aria-pressed", d.views[v.id].tag === t[0] ? "true" : "false");
+      b.onclick = function(){
+        d.views[v.id].tag = (d.views[v.id].tag === t[0]) ? "" : t[0];
+        save(); renderViews(); renderSteps(); renderHeader(); renderBoard();
+      };
+      tags.appendChild(b);
+    });
+    row.appendChild(tags);
+    wrap.appendChild(row);
+  });
+}
+
+function renderFacts(){
+  var wrap = $("facts"); wrap.innerHTML = "";
+  FACTS.forEach(function(f){
+    var row = el("div","fact");
+    row.appendChild(el("div","fact-q", f.q));
+    var ans = el("div","fact-a");
+    f.a.forEach(function(a){
+      var b = el("button", null, a);
+      b.type = "button";
+      b.setAttribute("aria-pressed", day().facts[f.id] === a ? "true" : "false");
+      b.onclick = function(){
+        var cur = day().facts[f.id];
+        day().facts[f.id] = (cur === a) ? "" : a;
+        save(); renderFacts(); renderSteps(); renderHeader(); renderBoard();
+      };
+      ans.appendChild(b);
+    });
+    row.appendChild(ans);
+    wrap.appendChild(row);
+  });
+}
+
+function renderLevels(){
+  var wrap = $("levels"); wrap.innerHTML = "";
+  LEVELS.forEach(function(l){
+    var box = el("div");
+    var lab = el("label", null, l.name);
+    lab.setAttribute("for","lv-"+l.id);
+    var inp = el("input"); inp.type = "text"; inp.className = "price"; inp.id = "lv-"+l.id;
+    inp.placeholder = "0000.00";
+    inp.value = day().levels[l.id] || "";
+    inp.oninput = function(){ day().levels[l.id] = inp.value; save(); };
+    box.appendChild(lab); box.appendChild(inp);
+    wrap.appendChild(box);
+  });
+  $("extraLevels").value = day().extraLevels || "";
+  $("analysis").value = day().analysis || "";
+}
+
+function renderSteps(){
+  var d = day();
+  $("step1").classList.toggle("done", !!(d.focus || d.focusFree));
+  $("step2").classList.toggle("done", (d.news||[]).length > 0);
+  $("step3").classList.toggle("done",
+    VIEWS.every(function(v){ return (d.views[v.id]||{}).tag; }));
+  $("step4").classList.toggle("done", factsAnswered() >= 10);
+  $("step5").classList.toggle("done",
+    LEVELS.some(function(l){ return d.levels[l.id]; }) || !!d.extraLevels);
+  $("step6").classList.toggle("done", !!d.analysis);
+}
+
+function renderBoard(){
+  var out = $("boardOut"); out.innerHTML = "";
+  var sub = $("boardSub");
+
+  if(!prepComplete()){
+    sub.textContent = "Locked until prep is done.";
+    var e = el("div","empty");
+    e.appendChild(el("strong", null, "Finish the prep first"));
+    e.appendChild(el("span", null,
+      "Tag all six timeframes and answer at least ten structural facts. The board can't tell you what's on until it knows what kind of day it is."));
+    out.appendChild(e);
+    return;
+  }
+
+  var v = verdicts();
+  var onCount = EDGES.filter(function(x){ return v[x.id].status === "on"; }).length;
+  sub.textContent = onCount === 0
+    ? "Nothing is on today. That's a valid answer."
+    : onCount + (onCount === 1 ? " edge is on today." : " edges are on today.");
+
+  var board = el("div","board");
+  EDGES.forEach(function(e){
+    var r = v[e.id], ovr = day().overrides[e.id];
+    var card = el("div","edge s-" + r.status);
+
+    var top = el("div","edge-top");
+    var left = el("div");
+    left.appendChild(el("div","edge-name", e.name));
+    left.appendChild(el("div","edge-short", e.short));
+    top.appendChild(left);
+    top.appendChild(el("div","verdict",
+      r.status === "on" ? "ON" : r.status === "caution" ? "CAUTION" : "OFF"));
+    card.appendChild(top);
+
+    var ul = el("ul","edge-why");
+    r.why.forEach(function(w){ ul.appendChild(el("li", null, w)); });
+    card.appendChild(ul);
+
+    if(r.status === "caution"){
+      card.appendChild(el("div","edge-cost",
+        "Minimum size only, and you type a reason before you take it."));
+    }
+    if(r.status === "off"){
+      card.appendChild(el("div","edge-locked",
+        "The setup can't exist today. This one has no door."));
+    }
+
+    if(r.status === "caution"){
+      if(ovr){
+        card.appendChild(el("div","ovr-note", "Your reason: " + ovr));
+      } else {
+        var row = el("div","edge-ovr");
+        var b = el("button", null, "Give a reason to use it");
+        b.onclick = function(){
+          var why = prompt("Why this one, when the day isn't backing it?");
+          if(why && why.trim()){
+            day().overrides[e.id] = why.trim();
+            save(); renderBoard(); renderIdeaEdges();
+            toast("Logged — it'll show up in review beside what it returned");
+          }
+        };
+        row.appendChild(b);
+        card.appendChild(row);
+      }
+    }
+    board.appendChild(card);
+  });
+  out.appendChild(board);
+
+  var note = el("div","card");
+  note.appendChild(el("h3", null, "How this was decided"));
+  var p = el("p","hint");
+  var bias = htfBias();
+  p.textContent = "Higher-timeframe read: " +
+    (bias === "aligned" ? "aligned" : bias === "conflicted" ? "conflicted" :
+     bias === "weak" ? "partial" : bias === "balanced" ? "balanced" : "not tagged") +
+    ". " + factsAnswered() + " of " + FACTS.length + " structural facts answered. " +
+    (isAfternoon() ? "Afternoon session." : "Morning — Afternoon Delight is shut.");
+  note.appendChild(p);
+  out.appendChild(note);
+}
+
+function renderIdeaEdges(){
+  var sel = $("ideaEdge"); sel.innerHTML = "";
+  if(!prepComplete()){
+    sel.appendChild(new Option("Finish prep first", ""));
+    sel.disabled = true; $("addIdea").disabled = true;
+    return;
+  }
+  sel.disabled = false; $("addIdea").disabled = false;
+  var v = verdicts(), any = false;
+  EDGES.forEach(function(e){
+    var r = v[e.id];
+    if(r.status === "off") return;
+    if(r.status === "caution" && !day().overrides[e.id]) return;
+    sel.appendChild(new Option(
+      e.name + (r.status === "caution" ? "  (caution — minimum size)" : ""), e.id));
+    any = true;
+  });
+  if(!any){
+    sel.appendChild(new Option("No edge is available today", ""));
+    sel.disabled = true; $("addIdea").disabled = true;
+  }
+}
+
+function renderIdeas(){
+  var out = $("ideasOut"); out.innerHTML = "";
+  var list = day().ideas || [];
+  if(!list.length){
+    var e = el("div","empty");
+    e.appendChild(el("strong", null, "No ideas yet"));
+    e.appendChild(el("span", null, "What is the trade idea, where is the stop, where is the entry."));
+    out.appendChild(e);
+    return;
+  }
+  list.forEach(function(it, i){
+    var name = (EDGES.filter(function(x){ return x.id === it.edge; })[0] || {}).name || it.edge;
+    var card = el("div","card");
+    var h = el("div","idea-h");
+    h.appendChild(el("b", null, name + " · " + it.dir + (it.caution ? "  · caution" : "")));
+    var x = el("button","x","×");
+    x.onclick = function(){ list.splice(i,1); save(); renderIdeas(); };
+    h.appendChild(x);
+    card.appendChild(h);
+
+    var legs = el("div","idea-legs");
+    [["ENTRY", it.entry],["STOP", it.stop],["TARGET", it.target]].forEach(function(p){
+      var d = el("div");
+      d.appendChild(el("span", null, p[0]));
+      d.appendChild(document.createTextNode(p[1] || "—"));
+      legs.appendChild(d);
+    });
+    card.appendChild(legs);
+    if(it.note) card.appendChild(el("p","hint", it.note));
+    out.appendChild(card);
+  });
+}
+
+/* =====================================================================
+   Claude API — used here only to pull the day's calendar.
+   The browser can't reach Financial Juice or Trading Economics
+   directly, so the model fetches and we confirm what it found.
+===================================================================== */
+async function callClaude(system, user, opts){
+  opts = opts || {};
+  if(!S.apiKey) throw new Error("no-key");
+  var body = {
+    model: "claude-sonnet-4-6",
+    max_tokens: 1000,
+    system: system,
+    messages: [{ role:"user", content:user }]
+  };
+  if(opts.search) body.tools = [{ type:"web_search_20250305", name:"web_search" }];
+
+  var res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "x-api-key": S.apiKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body: JSON.stringify(body)
+  });
+  if(res.status === 401) throw new Error("bad-key");
+  if(!res.ok){
+    var t = await res.text();
+    var err = new Error(t.slice(0,140)); err.status = res.status; throw err;
+  }
+  var data = await res.json();
+  return (data.content || [])
+    .map(function(c){ return c.type === "text" ? c.text : ""; })
+    .filter(Boolean).join("\n");
+}
+
+async function pullNews(){
+  var btn = $("pullNews");
+  btn.disabled = true; btn.textContent = "Looking…";
+  try{
+    var d = new Date();
+    var when = new Intl.DateTimeFormat("en-GB",
+      {weekday:"long", day:"numeric", month:"long", year:"numeric"}).format(d);
+    var text = await callClaude(
+      "You return only JSON. No preamble, no markdown fences.",
+      "Find today's US economic calendar events for " + when + ", the ones that move equity index " +
+      "futures. Check Financial Juice and Trading Economics. Return JSON: " +
+      '{"events":[{"time":"HH:MM UK time","what":"event name","impact":"high|medium|low"}]} ' +
+      "High impact only, maximum 5. If nothing significant, return an empty array.",
+      { search:true }
+    );
+    var clean = text.replace(/```json|```/g, "").trim();
+    var parsed = JSON.parse(clean);
+    var evs = parsed.events || [];
+    if(!evs.length){
+      toast("Nothing significant on the calendar today");
+    } else {
+      day().news = evs.map(function(e){
+        return { time:e.time || "", what:e.what || "", impact:e.impact || "" };
+      });
+      save(); renderNews(); renderSteps();
+      toast("Found " + evs.length + " — check them before you rely on them");
+    }
+  }catch(e){
+    toast(e.message === "no-key" ? "Add your API key in Settings"
+        : e.message === "bad-key" ? "That key was rejected — check Settings"
+        : "Couldn't pull the calendar — add events by hand");
+  }
+  btn.disabled = false; btn.textContent = "Pull today's events";
+}
+
+/* =====================================================================
+   Wiring
+===================================================================== */
+function go(name){
+  ["prep","board","plan","set"].forEach(function(v){
+    $("v-" + v).classList.toggle("on", v === name);
+  });
+  document.querySelectorAll("nav button").forEach(function(b){
+    if(b.dataset.go === name) b.setAttribute("aria-current","page");
+    else b.removeAttribute("aria-current");
+  });
+  if(name === "board") renderBoard();
+  if(name === "plan"){ renderIdeaEdges(); renderIdeas(); }
+  window.scrollTo(0,0);
+}
+
+document.querySelectorAll("nav button").forEach(function(b){
+  b.onclick = function(){ go(b.dataset.go); };
+});
+
+$("focusFree").oninput = function(){
+  day().focusFree = this.value; save(); renderSteps(); renderHeader();
+};
+$("extraLevels").oninput = function(){ day().extraLevels = this.value; save(); renderSteps(); };
+$("analysis").oninput = function(){ day().analysis = this.value; save(); renderSteps(); renderHeader(); };
+
+$("pullNews").onclick = pullNews;
+$("addNews").onclick = function(){
+  var t = $("newsTime").value.trim(), w = $("newsWhat").value.trim();
+  if(!w){ toast("What's the event?"); return; }
+  day().news.push({ time:t || "—", what:w, impact:"" });
+  $("newsTime").value = ""; $("newsWhat").value = "";
+  save(); renderNews(); renderSteps();
+};
+
+$("addIdea").onclick = function(){
+  var edge = $("ideaEdge").value;
+  if(!edge){ toast("Pick an edge the day allows"); return; }
+  var entry = $("ideaEntry").value.trim(), stop = $("ideaStop").value.trim();
+  if(!entry || !stop){ toast("An idea without a stop and an entry isn't an idea"); return; }
+  var v = verdicts();
+  day().ideas.push({
+    edge: edge, dir: $("ideaDir").value,
+    entry: entry, stop: stop,
+    target: $("ideaTarget").value.trim(),
+    note: $("ideaNote").value.trim(),
+    caution: v[edge].status === "caution"
+  });
+  ["ideaEntry","ideaStop","ideaTarget","ideaNote"].forEach(function(id){ $(id).value = ""; });
+  save(); renderIdeas(); toast("Idea added");
+};
+
+/* settings */
+function renderSettings(){
+  var m = $("modeChips"); m.innerHTML = "";
+  [["auto","Auto"],["light","Light"],["dark","Dark"]].forEach(function(o){
+    var b = el("button","chip", o[1]); b.type = "button";
+    b.setAttribute("aria-pressed", S.mode === o[0] ? "true" : "false");
+    b.onclick = function(){ S.mode = o[0]; save(); applyTheme(); renderSettings(); };
+    m.appendChild(b);
+  });
+  var a = $("accChips"); a.innerHTML = "";
+  [["graphite","Graphite"],["clay","Clay"],["pine","Pine"],["indigo","Indigo"],["ember","Ember"]]
+    .forEach(function(o){
+      var b = el("button","chip", o[1]); b.type = "button";
+      b.setAttribute("aria-pressed", S.accent === o[0] ? "true" : "false");
+      b.onclick = function(){ S.accent = o[0]; save(); applyTheme(); renderSettings(); };
+      a.appendChild(b);
+    });
+  $("pmStart").value = S.pmStart;
+  $("openTime").value = S.openTime;
+  $("apiKey").value = S.apiKey ? "sk-ant-…" + S.apiKey.slice(-6) : "";
+}
+$("pmStart").onchange = function(){ S.pmStart = this.value.trim() || "17:30"; save(); renderBoard(); };
+$("openTime").onchange = function(){ S.openTime = this.value.trim() || "14:30"; save(); };
+
+$("saveKey").onclick = function(){
+  var v = $("apiKey").value.trim();
+  if(v.indexOf("…") > -1){ toast("Key unchanged"); return; }
+  S.apiKey = v; save(); renderSettings();
+  toast(v ? "Key saved on this device" : "Key cleared");
+};
+$("testKey").onclick = async function(){
+  var out = $("keyOut"); out.textContent = "Testing…";
+  try{
+    var r = await callClaude("Reply with the single word: ready", "Test", {});
+    out.textContent = "Connected. Claude said: " + r.trim().slice(0,40);
+  }catch(e){
+    out.textContent = e.message === "no-key" ? "No key saved yet."
+      : e.message === "bad-key" ? "Key rejected. Check it and save again."
+      : "Couldn't reach Claude: " + e.message;
+  }
+};
+
+$("newDay").onclick = function(){
+  if(!confirm("Start a new trading day? Today's prep stays saved.")) return;
+  S.currentDay = todayKey();
+  if(S.days[S.currentDay] && Object.keys(S.days[S.currentDay].facts || {}).length){
+    if(!confirm("There's already prep for today. Clear it and start again?")) return;
+    delete S.days[S.currentDay];
+  }
+  day(); save(); renderAll(); go("prep"); toast("New day — focus carried over");
+};
+
+function renderAll(){
+  day();
+  applyTheme(); dstCheck(); renderHeader();
+  renderFocus(); renderNews(); renderViews(); renderFacts();
+  renderLevels(); renderSteps(); renderSettings();
+  renderBoard(); renderIdeaEdges(); renderIdeas();
+}
+
+window.matchMedia("(prefers-color-scheme: dark)")
+  .addEventListener("change", function(){ if(S.mode === "auto") applyTheme(); });
+
+renderAll();
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").catch(function(){});
+}
+</script>
+</body>
+</html>
