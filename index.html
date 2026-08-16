@@ -218,7 +218,7 @@ input[type=text].price{font-family:var(--f-data)}
 /* tab bar */
 nav{
   position:fixed;left:0;right:0;bottom:0;z-index:40;
-  display:grid;grid-template-columns:repeat(5,1fr);
+  display:grid;grid-template-columns:repeat(6,1fr);
   background:var(--card);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom);
 }
@@ -387,6 +387,43 @@ nav .ico{font-size:17px;line-height:1}
   body.coach-full #v-coach{width:calc(100% - 150px)}
 }
 
+
+/* ---- journal ---- */
+.lock{
+  border:1px solid var(--caution-line);background:var(--caution-bg);
+  color:var(--caution);border-radius:var(--radius);padding:14px;margin-bottom:var(--gap);
+}
+.lock h3{margin:0 0 4px;font-size:15px;font-weight:640;color:var(--caution)}
+.lock p{margin:0 0 10px;font-size:13.5px;line-height:1.45}
+.trade{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:13px 14px;margin-bottom:10px;position:relative;overflow:hidden;
+}
+.trade::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--ink-3)}
+.trade.win::before{background:var(--ok)}
+.trade.loss::before{background:var(--off)}
+.trade-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.trade-n{font:700 11px/1 var(--f-data);color:var(--ink-3);letter-spacing:1px}
+.trade-r{font:700 15px/1 var(--f-data)}
+.trade.win .trade-r{color:var(--ok)}
+.trade.loss .trade-r{color:var(--off)}
+.trade-legs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.trade-legs div{font:500 13px/1.3 var(--f-data)}
+.trade-legs span{display:block;font:600 9px/1 var(--f-body);color:var(--ink-3);letter-spacing:.9px;margin-bottom:3px}
+.rev-done{font-size:12px;color:var(--ok);font-weight:560;margin-top:9px}
+.rev-todo{font-size:12px;color:var(--caution);font-weight:560;margin-top:9px}
+.obs{
+  display:flex;gap:10px;padding:9px 0;font-size:13.5px;
+  border-bottom:1px dashed var(--line);
+}
+.obs .t{font:600 11px/1.5 var(--f-data);color:var(--ink-3);flex:0 0 42px}
+.obs .x{margin-left:auto}
+.quick{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.eod-done{
+  border:1px solid var(--ok-line);background:var(--ok-bg);color:var(--ok);
+  border-radius:var(--radius-sm);padding:10px 12px;font-size:13.5px;margin-bottom:var(--gap);
+}
+
 details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0}
 </style>
 </head>
@@ -408,6 +445,8 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
 <section class="view on" id="v-prep">
   <h2>Plan of attack</h2>
   <p class="sub">Fixed order. Observe first, interpret after — the sequence is the point.</p>
+
+  <div id="prepLock"></div>
 
   <div class="card" style="border-color:var(--acc)">
     <h3>Guided prep</h3>
@@ -531,6 +570,13 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <div id="ideasOut"></div>
 </section>
 
+<!-- ============================ JOURNAL ============================ -->
+<section class="view" id="v-journal">
+  <h2>Journal</h2>
+  <p class="sub">Trades, observations, and the review that closes the day.</p>
+  <div id="journalOut"></div>
+</section>
+
 <!-- ============================ COACH ============================ -->
 <section class="view" id="v-coach">
   <h2>Coach</h2>
@@ -613,6 +659,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <button data-go="prep" aria-current="page"><span class="ico">◷</span>Prep<span class="dot"></span></button>
   <button data-go="board"><span class="ico">▤</span>Board<span class="dot"></span></button>
   <button data-go="plan"><span class="ico">◎</span>Ideas<span class="dot"></span></button>
+  <button data-go="journal"><span class="ico">✎</span>Journal<span class="dot"></span></button>
   <button data-go="set"><span class="ico">⚙</span>Settings<span class="dot"></span></button>
   <button data-go="coach"><span class="ico">✳</span>Coach<span class="dot"></span></button>
 </nav>
@@ -661,16 +708,46 @@ function day(){
   S.currentDay = k;
   if(!S.days[k]){
     var prev = lastDay();
+    var carried = (prev && prev.eod && prev.eod.tomorrow) ? prev.eod.tomorrow : null;
+    var FO = (typeof FOCUS_OPTIONS !== "undefined") ? FOCUS_OPTIONS : [];
     S.days[k] = {
-      focus: prev ? prev.focus : "",       /* focus carries over, by design */
-      focusFree: prev ? prev.focusFree : "",
+      trades: [], obs: [], eod: null,
+      /* yesterday's closing decision becomes today's focus */
+      focus: carried && FO.indexOf(carried) > -1 ? carried
+             : (carried ? "" : (prev ? prev.focus : "")),
+      focusFree: carried && FO.indexOf(carried) < 0 ? carried
+                 : (carried ? "" : (prev ? prev.focusFree : "")),
       news: [],
       views: {}, facts: {}, levels: {},
       extraLevels: "", analysis: "",
       ideas: [], overrides: {}
     };
   }
-  return S.days[k];
+  var d = S.days[k];
+  if(!d.trades) d.trades = [];        /* days written by an older version */
+  if(!d.obs)    d.obs = [];
+  if(d.eod === undefined) d.eod = null;
+  return d;
+}
+
+/* The most recent day with anything in it, other than today. */
+function priorDay(){
+  var keys = Object.keys(S.days).sort();
+  var today = S.currentDay || todayKey();
+  for(var i = keys.length - 1; i >= 0; i--){
+    if(keys[i] >= today) continue;
+    var d = S.days[keys[i]];
+    var used = (d.trades || []).length || (d.ideas || []).length ||
+               Object.keys(d.facts || {}).length;
+    if(used) return { key: keys[i], d: d };
+  }
+  return null;
+}
+function reviewOutstanding(){
+  var p = priorDay();
+  if(!p) return null;
+  if(p.d.eod && (p.d.eod.done || p.d.eod.skipped)) return null;
+  return p;
 }
 function lastDay(){
   var keys = Object.keys(S.days).sort();
@@ -940,6 +1017,29 @@ function renderHeader(){
   $("hdrDate").textContent = new Intl.DateTimeFormat("en-GB",
     {weekday:"short", day:"numeric", month:"short"}).format(d).toUpperCase();
   $("hdrProg").style.width = prepPercent() + "%";
+}
+
+function renderPrepLock(){
+  var box = $("prepLock"); box.innerHTML = "";
+  var pending = reviewOutstanding();
+  if(!pending) return;
+  var lk = el("div","lock");
+  lk.appendChild(el("h3", null, "Close out " + pending.key + " first"));
+  lk.appendChild(el("p", null,
+    "The last trading day was never reviewed. Prep and the board stay shut until it is — that's the chain you asked for. If there's nothing left to reconstruct, skip it with a reason instead."));
+  var row = el("div","cap-row");
+  var b1 = el("button","cap-btn"); b1.type = "button"; b1.textContent = "Close it now";
+  b1.onclick = function(){ openEod(pending.key); };
+  var b2 = el("button","cap-btn plain"); b2.type = "button"; b2.textContent = "Skip with a reason";
+  b2.onclick = function(){
+    var why = prompt("Why is this one being skipped?");
+    if(!why || !why.trim()) return;
+    pending.d.eod = { skipped:true, reason:why.trim(), at:new Date().toISOString() };
+    save(); renderAll();
+  };
+  row.appendChild(b1); row.appendChild(b2);
+  lk.appendChild(row);
+  box.appendChild(lk);
 }
 
 function renderFocus(){
@@ -1294,6 +1394,16 @@ function renderBoard(){
   var out = $("boardOut"); out.innerHTML = "";
   var sub = $("boardSub");
 
+  var pending = reviewOutstanding();
+  if(pending){
+    sub.textContent = "Locked until the last day is closed out.";
+    var e0 = el("div","empty");
+    e0.appendChild(el("strong", null, "Close out " + pending.key));
+    e0.appendChild(el("span", null,
+      "The board stays shut until the previous day has been reviewed. It's in the Journal tab."));
+    out.appendChild(e0);
+    return;
+  }
   if(!prepComplete()){
     sub.textContent = "Locked until prep is done.";
     var e = el("div","empty");
@@ -1545,12 +1655,13 @@ function go(name){
   }
   if(isDesktop()) document.body.classList.remove("coach-full");
   CURRENT = name;
-  ["prep","board","plan","coach","set"].forEach(function(v){
+  ["prep","board","plan","journal","coach","set"].forEach(function(v){
     $("v-" + v).classList.toggle("on", v === name);
   });
   syncNav(name);
   if(name === "board") renderBoard();
   if(name === "plan"){ renderIdeaEdges(); renderIdeas(); }
+  if(name === "journal") renderJournal();
   if(name === "coach") renderCoach();
   window.scrollTo(0,0);
 }
@@ -1973,7 +2084,9 @@ function closeWiz(){
   $("wiz").classList.remove("on");
   document.body.style.overflow = "";
   speechSynthesis && speechSynthesis.cancel && speechSynthesis.cancel();
+  var cb = WIZ.onClose; WIZ.onClose = null;
   renderAll();
+  if(cb) cb();
 }
 function wizRender(){
   var s = WIZ.steps[WIZ.i];
@@ -2017,7 +2130,13 @@ function wizBack(){
   if(WIZ.i > 0){ WIZ.i--; wizRender(); }
 }
 
-$("startWiz").onclick = openWiz;
+$("startWiz").onclick = function(){
+  if(reviewOutstanding()){
+    toast("Close out the last day first — it's in the Journal");
+    go("journal"); return;
+  }
+  openWiz();
+};
 $("wizClose").onclick = closeWiz;
 $("wizNext").onclick = wizNext;
 $("wizBack").onclick = wizBack;
@@ -2094,6 +2213,18 @@ function dayContext(){
   }
   if((d.news || []).length){
     out.push("News: " + d.news.map(function(n){ return n.time + " " + n.what; }).join("; "));
+  }
+  if((d.trades || []).length){
+    out.push("Trades today: " + d.trades.map(function(t){
+      return "T" + t.n + " " + t.edge + " " + t.dir + " entry " + t.entry +
+        " stop " + t.stop + (t.exit ? " exit " + t.exit : "") +
+        (t.result !== "" ? " result " + t.result : "") +
+        (t.mae ? " worst against " + t.mae : "") +
+        (t.status === "caution" ? " (taken on caution)" : "");
+    }).join("; "));
+  }
+  if((d.obs || []).length){
+    out.push("Observations: " + d.obs.map(function(o){ return o.t + " " + o.text; }).join("; "));
   }
   if((d.ideas || []).length){
     out.push("Ideas: " + d.ideas.map(function(i){
@@ -2205,13 +2336,508 @@ function measureHeader(){
 }
 window.addEventListener("resize", measureHeader);
 
+
+/* =====================================================================
+   Journal. Trades, in-session observations, and the review that
+   closes the day. The four-minute review is the point of all of it:
+   risk taken is what actually happened, not what you planned.
+===================================================================== */
+
+var QUICK_OBS = [
+  "Wanting to enter with no idea",
+  "Scared and don't know why",
+  "Itching to add",
+  "Wanting to move the stop",
+  "Bored",
+  "Feeling behind",
+  "On plan"
+];
+
+function nowHM(){
+  return new Intl.DateTimeFormat("en-GB",
+    { hour:"2-digit", minute:"2-digit", hour12:false, timeZone:"Europe/London" })
+    .format(new Date());
+}
+
+function tagSnapshot(){
+  var d = day();
+  return VIEWS.map(function(v){
+    var t = (d.views[v.id] || {}).tag;
+    return t ? v.id + ":" + t : null;
+  }).filter(Boolean).join(" ");
+}
+
+function renderJournal(){
+  var out = $("journalOut"); out.innerHTML = "";
+  var d = day();
+
+  /* ---- outstanding review from a previous day blocks nothing here,
+          but it's stated plainly so it doesn't get forgotten ---- */
+  var pending = reviewOutstanding();
+  if(pending){
+    var lk = el("div","lock");
+    lk.appendChild(el("h3", null, "Yesterday's review is still open"));
+    lk.appendChild(el("p", null,
+      "The day of " + pending.key + " was never closed out. Prep stays locked until it is — close it properly, or mark it skipped with a reason."));
+    var row = el("div","cap-row");
+    var b1 = el("button","cap-btn"); b1.type = "button"; b1.textContent = "Close it now";
+    b1.onclick = function(){ openEod(pending.key); };
+    var b2 = el("button","cap-btn plain"); b2.type = "button"; b2.textContent = "Skip with a reason";
+    b2.onclick = function(){
+      var why = prompt("Why is this one being skipped?");
+      if(!why || !why.trim()) return;
+      pending.d.eod = { skipped:true, reason:why.trim(), at:new Date().toISOString() };
+      save(); renderJournal(); renderAll();
+    };
+    row.appendChild(b1); row.appendChild(b2);
+    lk.appendChild(row);
+    out.appendChild(lk);
+  }
+
+  /* ---- observations ---- */
+  var oc = el("div","card");
+  oc.appendChild(el("h3", null, "Observations"));
+  oc.appendChild(el("p","hint","Catch the impulse before it becomes an action. One tap."));
+  var quick = el("div","quick");
+  QUICK_OBS.forEach(function(q){
+    var b = el("button","chip sm", q); b.type = "button";
+    b.onclick = function(){ addObs(q); };
+    quick.appendChild(b);
+  });
+  oc.appendChild(quick);
+  var oi = el("input"); oi.type = "text"; oi.placeholder = "Or write it";
+  oi.onkeydown = function(e){
+    if(e.key === "Enter" && oi.value.trim()){ addObs(oi.value.trim()); oi.value = ""; }
+  };
+  oc.appendChild(oi);
+  if(d.obs.length){
+    var list = el("div"); list.style.marginTop = "10px";
+    d.obs.forEach(function(o, i){
+      var r = el("div","obs");
+      r.appendChild(el("span","t", o.t));
+      r.appendChild(el("span", null, "O" + (i+1) + " · " + o.text));
+      var x = el("button","x","×"); x.className = "x";
+      x.onclick = function(){ d.obs.splice(i,1); save(); renderJournal(); };
+      r.appendChild(x);
+      list.appendChild(r);
+    });
+    oc.appendChild(list);
+  }
+  out.appendChild(oc);
+
+  /* ---- log a trade ---- */
+  var tc = el("div","card");
+  tc.appendChild(el("h3", null, "Log a trade"));
+  tc.appendChild(el("p","hint","Shoot your platform's trade log and let Claude read it, or fill it in yourself. Everything stays editable."));
+
+  var cap = el("div","cap-row");
+  var shoot = el("label","cap-btn");
+  shoot.appendChild(document.createTextNode("Shoot the trade log"));
+  var file = el("input"); file.type = "file"; file.accept = "image/*"; file.multiple = true;
+  file.style.display = "none";
+  file.onchange = function(){ addShots("__trade", file.files); file.value = ""; setTimeout(renderJournal, 400); };
+  shoot.appendChild(file); cap.appendChild(shoot);
+  var readBtn = el("button","cap-btn plain"); readBtn.type = "button"; readBtn.textContent = "Read it";
+  readBtn.onclick = function(){ readTradeShot(readBtn); };
+  cap.appendChild(readBtn);
+  tc.appendChild(cap);
+
+  var shots = SHOTS.__trade || [];
+  if(shots.length){
+    var th = el("div","thumbs");
+    shots.forEach(function(s, i){
+      var dd = el("div","drop");
+      var img = el("img"); img.src = s.url;
+      var x = el("button", null, "×");
+      x.onclick = function(){ shots.splice(i,1); renderJournal(); };
+      dd.appendChild(img); dd.appendChild(x); th.appendChild(dd);
+    });
+    tc.appendChild(th);
+  }
+
+  var F = TRADE_FORM;
+  var eLab = el("label", null, "Edge"); tc.appendChild(eLab);
+  var eSel = el("select"); eSel.id = "tfEdge";
+  EDGES.forEach(function(e){ eSel.appendChild(new Option(e.name, e.id)); });
+  eSel.appendChild(new Option("Off-plan / no edge", "none"));
+  eSel.value = F.edge || "";
+  eSel.onchange = function(){ F.edge = eSel.value; };
+  tc.appendChild(eSel);
+
+  var grid = el("div","levels-grid"); grid.style.marginTop = "4px";
+  [["dir","Direction","select"],["size","Contracts","text"],
+   ["entry","Entry","text"],["stop","Stop","text"],
+   ["exit","Exit","text"],["mae","Worst point against you","text"],
+   ["result","Result (+/-)","text"]].forEach(function(f){
+    var box = el("div");
+    box.appendChild(el("label", null, f[1]));
+    var inp;
+    if(f[2] === "select"){
+      inp = el("select");
+      ["Long","Short"].forEach(function(o){ inp.appendChild(new Option(o, o)); });
+      inp.value = F.dir || "Long";
+    } else {
+      inp = el("input"); inp.type = "text"; inp.className = "price";
+      inp.value = F[f[0]] || "";
+      inp.placeholder = f[0] === "result" ? "e.g. -37.50" : "0000.00";
+    }
+    inp.id = "tf-" + f[0];
+    inp.oninput = inp.onchange = function(){ F[f[0]] = inp.value; };
+    box.appendChild(inp); grid.appendChild(box);
+  });
+  tc.appendChild(grid);
+
+  var addBtn = el("button","btn wide"); addBtn.type = "button"; addBtn.textContent = "Add trade";
+  addBtn.style.marginTop = "12px";
+  addBtn.onclick = addTrade;
+  tc.appendChild(addBtn);
+  out.appendChild(tc);
+
+  /* ---- today's trades ---- */
+  if(d.trades.length){
+    var h = el("div"); h.style.margin = "18px 0 10px";
+    h.appendChild(el("h3", null, "Today's trades"));
+    out.appendChild(h);
+    d.trades.forEach(function(t, i){ out.appendChild(tradeCard(t, i)); });
+    out.appendChild(dayTotals());
+  }
+
+  /* ---- end of day ---- */
+  out.appendChild(eodCard());
+}
+
+function addObs(text){
+  day().obs.push({ t: nowHM(), text: text });
+  save(); renderJournal();
+}
+
+var TRADE_FORM = {};
+
+async function readTradeShot(btn){
+  var shots = SHOTS.__trade || [];
+  if(!shots.length){ toast("Shoot the trade log first"); return; }
+  btn.disabled = true; btn.textContent = "Reading…";
+  var content = shots.map(function(s){
+    return { type:"image", source:{ type:"base64", media_type:s.type, data:s.b64 } };
+  });
+  content.push({ type:"text", text:
+    "This is a screenshot of my futures trading platform's trade log or position ticket for mES " +
+    "(micro E-mini S&P 500). Read the printed figures only.\n\n" +
+    "Return ONLY this JSON, no prose, no code fences:\n" +
+    '{"dir":"Long|Short","size":"number of contracts","entry":"","exit":"","stop":"",' +
+    '"result":"profit or loss with a minus sign if a loss, number only","unsure":[]}\n\n' +
+    "Leave any field empty rather than guessing, and say what you could not read in 'unsure'. " +
+    "Never infer a price from a chart position — only printed numbers."
+  });
+  try{
+    var text = await callClaudeRaw([{ role:"user", content:content }],
+      "You read trading platform screenshots precisely and never invent a number. JSON only.");
+    var p = JSON.parse(text.replace(/```json|```/g, "").trim());
+    ["dir","size","entry","exit","stop","result"].forEach(function(k){
+      if(p[k]) TRADE_FORM[k] = String(p[k]);
+    });
+    renderJournal();
+    toast((p.unsure || []).length
+      ? "Read it — couldn't get: " + p.unsure.join(", ")
+      : "Read it — check the figures before you add");
+  }catch(e){
+    toast(e.message === "no-key" ? "Add your API key in Settings"
+        : "Couldn't read that — " + e.message.slice(0,60));
+  }
+  btn.disabled = false; btn.textContent = "Read it";
+}
+
+function addTrade(){
+  var F = TRADE_FORM, d = day();
+  if(!F.edge){ toast("Which edge was it?"); return; }
+  if(!F.entry || !F.stop){ toast("Entry and stop — those two at least"); return; }
+  var v = prepComplete() ? verdicts() : null;
+  d.trades.push({
+    n: d.trades.length + 1,
+    time: nowHM(),
+    edge: F.edge,
+    dir: F.dir || "Long",
+    size: F.size || "",
+    entry: F.entry, stop: F.stop,
+    exit: F.exit || "", mae: F.mae || "",
+    result: F.result || "",
+    tags: tagSnapshot(),
+    status: v && v[F.edge] ? v[F.edge].status : "n/a",
+    review: null
+  });
+  TRADE_FORM = {};
+  SHOTS.__trade = [];
+  save(); renderJournal();
+  toast("Logged. The four-minute review is where the value is.");
+}
+
+function tradeCard(t, i){
+  var num = parseFloat(String(t.result).replace(/[^0-9.\-]/g, ""));
+  var cls = isNaN(num) ? "" : (num >= 0 ? "win" : "loss");
+  var card = el("div","trade " + cls);
+
+  var top = el("div","trade-top");
+  var left = el("div");
+  var name = (EDGES.filter(function(e){ return e.id === t.edge; })[0] || {}).name || "Off-plan";
+  left.appendChild(el("div","trade-n", "T" + t.n + " · " + t.time));
+  left.appendChild(el("div", null, name + " · " + t.dir +
+    (t.status === "caution" ? " · caution" : "") +
+    (t.edge === "none" ? " · no edge" : "")));
+  top.appendChild(left);
+  if(t.result !== "") top.appendChild(el("div","trade-r", (num >= 0 ? "+" : "") + t.result));
+  card.appendChild(top);
+
+  var legs = el("div","trade-legs");
+  [["ENTRY", t.entry],["STOP", t.stop],["EXIT", t.exit],["WORST", t.mae]].forEach(function(p){
+    var dd = el("div");
+    dd.appendChild(el("span", null, p[0]));
+    dd.appendChild(document.createTextNode(p[1] || "—"));
+    legs.appendChild(dd);
+  });
+  card.appendChild(legs);
+
+  if(t.review){
+    card.appendChild(el("div","rev-done","Reviewed"));
+    var det = el("details");
+    det.appendChild(el("summary", null, "The review"));
+    [["Context", t.review.context],["Idea", t.review.idea],
+     ["Did well", t.review.success],["Do better", t.review.improve]].forEach(function(r){
+      if(!r[1]) return;
+      var p = el("p","hint"); p.style.margin = "6px 0";
+      p.appendChild(el("b", null, r[0] + ": "));
+      p.appendChild(document.createTextNode(r[1]));
+      det.appendChild(p);
+    });
+    card.appendChild(det);
+  } else {
+    card.appendChild(el("div","rev-todo","Not reviewed yet"));
+  }
+
+  var row = el("div","cap-row");
+  var rb = el("button","cap-btn"); rb.type = "button";
+  rb.textContent = t.review ? "Edit the review" : "Four-minute review";
+  rb.onclick = function(){ openReview(i); };
+  row.appendChild(rb);
+  var x = el("button","cap-btn plain"); x.type = "button"; x.textContent = "Delete";
+  x.onclick = function(){
+    if(!confirm("Delete T" + t.n + "?")) return;
+    day().trades.splice(i,1);
+    day().trades.forEach(function(tt, n){ tt.n = n + 1; });
+    save(); renderJournal();
+  };
+  row.appendChild(x);
+  card.appendChild(row);
+  return card;
+}
+
+function dayTotals(){
+  var d = day(), n = 0, wins = 0, sum = 0, counted = 0;
+  d.trades.forEach(function(t){
+    n++;
+    var r = parseFloat(String(t.result).replace(/[^0-9.\-]/g, ""));
+    if(!isNaN(r)){ counted++; sum += r; if(r >= 0) wins++; }
+  });
+  var c = el("div","card");
+  c.appendChild(el("h3", null, "Today"));
+  var p = el("p","hint");
+  p.textContent = n + (n === 1 ? " trade" : " trades") +
+    (counted ? " · " + wins + " green, " + (counted - wins) + " red · net " +
+      (sum >= 0 ? "+" : "") + sum.toFixed(2) : "") +
+    ". One day is noise — the numbers mean something across a sample.";
+  c.appendChild(p);
+  return c;
+}
+
+/* ---- the four-minute review ---- */
+function openReview(i){
+  var t = day().trades[i];
+  WIZ.steps = [{
+    say: "Four minute review of trade " + t.n + ".",
+    render: function(box){
+      var r = t.review || { context:"", idea:"", success:"", improve:"" };
+      box.appendChild(el("h2","wiz-q","T" + t.n + " — four-minute review"));
+      box.appendChild(el("p","wiz-sub",
+        "Risk taken is how far it actually went against you, not what you planned. That gap is where the holes show."));
+
+      var mLab = el("label", null, "Worst point against you");
+      var mIn = el("input"); mIn.type = "text"; mIn.className = "price";
+      mIn.value = t.mae || "";
+      mIn.oninput = function(){ t.mae = mIn.value; save(); };
+      box.appendChild(mLab); box.appendChild(mIn);
+
+      [["context","Context — why did this trade exist? (two lines)"],
+       ["idea","The trade idea, in one line"],
+       ["success","One thing you did well"],
+       ["improve","One thing to do better"]].forEach(function(f){
+        box.appendChild(el("label", null, f[1]));
+        var ta = el("textarea");
+        ta.value = r[f[0]] || "";
+        ta.oninput = function(){
+          t.review = t.review || { context:"", idea:"", success:"", improve:"" };
+          t.review[f[0]] = ta.value; save();
+        };
+        box.appendChild(ta);
+      });
+    },
+    ready: function(){
+      return !!(t.review && t.review.context && t.review.idea);
+    },
+    need: "Context and the idea at minimum — the rest can be short"
+  }];
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+  WIZ.onClose = function(){ renderJournal(); };
+}
+
+/* ---- end of day ---- */
+function eodCard(){
+  var d = day();
+  var c = el("div","card");
+  c.appendChild(el("h3", null, "End of day"));
+  if(d.eod && d.eod.done){
+    c.appendChild(el("div","eod-done","Closed out. Tomorrow's prep is unlocked."));
+    var det = el("details");
+    det.appendChild(el("summary", null, "What you wrote"));
+    [["Recap", d.eod.recap],["Victories", d.eod.victories],
+     ["Struggles", d.eod.struggles],["Tomorrow", d.eod.tomorrow]].forEach(function(r){
+      if(!r[1]) return;
+      var p = el("p","hint"); p.style.margin = "6px 0";
+      p.appendChild(el("b", null, r[0] + ": "));
+      p.appendChild(document.createTextNode(r[1]));
+      det.appendChild(p);
+    });
+    c.appendChild(det);
+    var again = el("button","cap-btn plain"); again.type = "button";
+    again.textContent = "Edit it"; again.style.marginTop = "10px";
+    again.onclick = function(){ openEod(S.currentDay || todayKey()); };
+    c.appendChild(again);
+  } else {
+    c.appendChild(el("p","hint",
+      "Closes the session and unlocks tomorrow. Recap, what went well, what didn't, and what tomorrow's focus should be."));
+    var unrev = d.trades.filter(function(t){ return !t.review; }).length;
+    if(unrev){
+      c.appendChild(el("div","rev-todo",
+        unrev + (unrev === 1 ? " trade still needs its review." : " trades still need their reviews.")));
+    }
+    var b = el("button","btn wide"); b.type = "button"; b.textContent = "Close the day";
+    b.style.marginTop = "10px";
+    b.onclick = function(){ openEod(S.currentDay || todayKey()); };
+    c.appendChild(b);
+  }
+  return c;
+}
+
+function openEod(dayKey){
+  var d = S.days[dayKey];
+  if(!d) return;
+  d.eod = d.eod || { recap:"", victories:"", struggles:"", tomorrow:"", done:false };
+  var trades = d.trades || [];
+
+  WIZ.steps = [
+    {
+      say: "Recap the day.",
+      render: function(box){
+        box.appendChild(el("h2","wiz-q","How did the day go?"));
+        var line = trades.length
+          ? trades.length + (trades.length === 1 ? " trade taken." : " trades taken.")
+          : "No trades taken.";
+        box.appendChild(el("p","wiz-sub", line + " A recap in your own words — what actually happened."));
+        var ta = el("textarea"); ta.style.minHeight = "120px";
+        ta.value = d.eod.recap || "";
+        ta.oninput = function(){ d.eod.recap = ta.value; save(); };
+        box.appendChild(ta);
+      },
+      ready: function(){ return !!d.eod.recap; },
+      need: "A few lines on the day"
+    },
+    {
+      say: "Two or three victories.",
+      render: function(box){
+        box.appendChild(el("h2","wiz-q","Two or three victories"));
+        box.appendChild(el("p","wiz-sub",
+          "Process, not profit. Waiting for the level counts. Sitting out counts."));
+        var ta = el("textarea"); ta.style.minHeight = "110px";
+        ta.value = d.eod.victories || "";
+        ta.oninput = function(){ d.eod.victories = ta.value; save(); };
+        box.appendChild(ta);
+      },
+      ready: function(){ return !!d.eod.victories; },
+      need: "At least one — there's always one"
+    },
+    {
+      say: "Where did you struggle?",
+      render: function(box){
+        box.appendChild(el("h2","wiz-q","Where did you struggle?"));
+        box.appendChild(el("p","wiz-sub","Honestly. This is the half that changes anything."));
+        var ta = el("textarea"); ta.style.minHeight = "110px";
+        ta.value = d.eod.struggles || "";
+        ta.oninput = function(){ d.eod.struggles = ta.value; save(); };
+        box.appendChild(ta);
+      },
+      ready: function(){ return true; },
+      need: ""
+    },
+    {
+      say: "What should tomorrow's focus be?",
+      render: function(box){
+        box.appendChild(el("h2","wiz-q","Tomorrow's focus"));
+        box.appendChild(el("p","wiz-sub","This carries into tomorrow's prep as your starting focus."));
+        var chips = el("div","chips");
+        FOCUS_OPTIONS.forEach(function(t){
+          var b = el("button","chip", t); b.type = "button";
+          b.setAttribute("aria-pressed", d.eod.tomorrow === t ? "true" : "false");
+          b.onclick = function(){ d.eod.tomorrow = t; save(); wizRerender(); };
+          chips.appendChild(b);
+        });
+        box.appendChild(chips);
+        var inp = el("input"); inp.type = "text"; inp.style.marginTop = "14px";
+        inp.placeholder = "Or write your own";
+        inp.value = (FOCUS_OPTIONS.indexOf(d.eod.tomorrow) < 0 ? (d.eod.tomorrow || "") : "");
+        inp.oninput = function(){ d.eod.tomorrow = inp.value; save(); };
+        box.appendChild(inp);
+      },
+      ready: function(){ return !!d.eod.tomorrow; },
+      need: "One line — it becomes tomorrow's focus"
+    },
+    {
+      say: "That's the day closed.",
+      render: function(box){
+        d.eod.done = true;
+        d.eod.at = new Date().toISOString();
+        save();
+        box.appendChild(el("h2","wiz-q","Day closed"));
+        box.appendChild(el("p","wiz-sub",
+          "Tomorrow's prep is unlocked, and tomorrow's focus is set to: " + d.eod.tomorrow));
+        var unrev = trades.filter(function(t){ return !t.review; }).length;
+        if(unrev){
+          box.appendChild(el("div","rev-todo",
+            unrev + " trade" + (unrev === 1 ? "" : "s") + " still without a review. Worth doing while you remember it."));
+        }
+        var exp = el("button","btn wide"); exp.type = "button";
+        exp.textContent = "Export today's data"; exp.style.marginTop = "14px";
+        exp.onclick = function(){ $("expData").click(); };
+        box.appendChild(exp);
+      },
+      ready: function(){ return true; },
+      need: ""
+    }
+  ];
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+  WIZ.onClose = function(){ renderJournal(); renderAll(); };
+}
+
 function renderAll(){
   day();
   applyTheme(); dstCheck(); renderHeader();
   renderFocus(); renderNews(); renderViews(); renderFacts();
   renderLevels(); renderSteps(); renderSettings();
   renderBoard(); renderIdeaEdges(); renderIdeas();
-  renderCoach();
+  renderPrepLock(); renderJournal(); renderCoach();
   buildClocks(); tickClocks(); measureHeader();
 }
 setInterval(tickClocks, 1000);
