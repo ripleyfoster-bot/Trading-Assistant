@@ -384,7 +384,8 @@ nav .ico{font-size:17px;line-height:1}
   #v-coach .chat{flex:1;overflow-y:auto}
   #v-coach .chat-input{position:sticky;bottom:0;background:var(--bg);padding-top:6px}
   body.coach-full main{display:none}
-  body.coach-full #v-coach{width:calc(100% - 150px)}
+  body.coach-full #v-coach{width:calc(100% - 150px);padding:20px 26px}
+  #v-coach h2{margin-top:0}
 }
 
 
@@ -424,6 +425,9 @@ nav .ico{font-size:17px;line-height:1}
   border-radius:var(--radius-sm);padding:10px 12px;font-size:13.5px;margin-bottom:var(--gap);
 }
 
+
+#v-coach{padding:16px;max-width:900px;margin:0 auto}
+
 details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0}
 </style>
 </head>
@@ -434,6 +438,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
     <h1>Trading Assistant</h1>
     <div class="clocks" id="clocks"></div>
     <span class="h-date" id="hdrDate"></span>
+    <span class="h-date" id="hdrVer" style="opacity:.55;margin-left:8px"></span>
   </div>
   <div class="prog"><i id="hdrProg"></i></div>
   <div id="dstBanner"></div>
@@ -577,17 +582,6 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <div id="journalOut"></div>
 </section>
 
-<!-- ============================ COACH ============================ -->
-<section class="view" id="v-coach">
-  <h2>Coach</h2>
-  <p class="sub">Ask about the method, the board, or today's read. It knows your prep.</p>
-  <div class="chat" id="chatOut"></div>
-  <div class="chat-input">
-    <textarea id="chatIn" placeholder="Ask anything — why is an edge off, what does acceptance mean, is this a Sand day…"></textarea>
-    <button class="btn" id="chatSend">Send</button>
-  </div>
-</section>
-
 <!-- ============================ SETTINGS ============================ -->
 <section class="view" id="v-set">
   <h2>Settings</h2>
@@ -623,6 +617,12 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   </div>
 
   <div class="card">
+    <h3>Version</h3>
+    <p class="hint" id="verLine"></p>
+    <button class="cap-btn plain" type="button" id="forceUpdate">Force an update check</button>
+  </div>
+
+  <div class="card">
     <h3>Your data</h3>
     <p class="hint">Everything lives on this device. Export a file to back it up or move it to another device; import it there. Your API key is never included in the export.</p>
     <div class="row-2">
@@ -640,6 +640,18 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
 </section>
 
 </main>
+
+<!-- ============================ COACH ============================ -->
+<section class="view" id="v-coach">
+  <h2>Coach</h2>
+  <p class="sub">Ask about the method, the board, or today's read. It knows your prep.</p>
+  <div class="chat" id="chatOut"></div>
+  <div class="chat-input">
+    <textarea id="chatIn" placeholder="Ask anything — why is an edge off, what does acceptance mean, is this a Sand day…"></textarea>
+    <button class="btn" id="chatSend">Send</button>
+  </div>
+</section>
+
 
 <div class="wiz" id="wiz" role="dialog" aria-modal="true">
   <div class="wiz-top">
@@ -673,6 +685,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
+var APP_VERSION = "2.2";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1017,6 +1030,7 @@ function renderHeader(){
   $("hdrDate").textContent = new Intl.DateTimeFormat("en-GB",
     {weekday:"short", day:"numeric", month:"short"}).format(d).toUpperCase();
   $("hdrProg").style.width = prepPercent() + "%";
+  $("hdrVer").textContent = "v" + APP_VERSION;
 }
 
 function renderPrepLock(){
@@ -1649,8 +1663,13 @@ function go(name){
   if(isDesktop() && name === "coach"){
     /* coach lives on the right already — the button just expands it */
     var full = document.body.classList.toggle("coach-full");
+    var panel = $("v-coach");
+    panel.classList.add("on");
+    /* if any stylesheet ever hides it, override here rather than fail silently */
+    panel.style.display = "flex";
     renderCoach();
     syncNav(full ? "coach" : CURRENT);
+    setTimeout(function(){ $("chatIn").focus(); }, 60);
     return;
   }
   if(isDesktop()) document.body.classList.remove("coach-full");
@@ -1735,12 +1754,28 @@ function renderSettings(){
       b.onclick = function(){ S.accent = o[0]; save(); applyTheme(); renderSettings(); };
       a.appendChild(b);
     });
+  $("verLine").textContent = "Trading Assistant v" + APP_VERSION +
+    ". If this doesn't match the newest version, the old files are still cached — force an update, or close and reopen the app.";
   $("pmStart").value = S.pmStart;
   $("openTime").value = S.openTime;
   $("apiKey").value = S.apiKey ? "sk-ant-…" + S.apiKey.slice(-6) : "";
 }
 $("pmStart").onchange = function(){ S.pmStart = this.value.trim() || "17:30"; save(); renderBoard(); };
 $("openTime").onchange = function(){ S.openTime = this.value.trim() || "14:30"; save(); };
+
+$("forceUpdate").onclick = async function(){
+  try{
+    if("caches" in window){
+      var keys = await caches.keys();
+      await Promise.all(keys.map(function(k){ return caches.delete(k); }));
+    }
+    if(navigator.serviceWorker){
+      var regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(function(r){ return r.unregister(); }));
+    }
+  }catch(e){}
+  location.reload(true);
+};
 
 $("saveKey").onclick = function(){
   var v = $("apiKey").value.trim();
@@ -2151,7 +2186,8 @@ $("wizSay").onclick = function(){
    History lives with the day, capped so context stays small and cheap.
 ===================================================================== */
 var METHOD_BRIEF =
-  "You are the coach inside Ripley's Trading Assistant app for micro E-mini S&P (mES) futures. " +
+  "You are the coach inside Ripley's Trading Assistant app (version " + APP_VERSION + ") for micro E-mini S&P (mES) futures. " +
+  "If he asks what version the app is, answer with that number. " +
   "His method is Korbs' Profile Method: Auction Market Theory, volume profile, VWAP and value areas. " +
   "Six edges only: " +
   "Go With The Flow (higher-timeframe VWAP bias, enter at daily value-area extreme on a pullback, first target VWAP then opposite extreme); " +
@@ -2334,7 +2370,15 @@ function measureHeader(){
   var h = document.querySelector("header");
   if(h) document.documentElement.style.setProperty("--hdr-h", h.offsetHeight + "px");
 }
-window.addEventListener("resize", measureHeader);
+window.addEventListener("resize", function(){
+  measureHeader();
+  if(!isDesktop()){
+    document.body.classList.remove("coach-full");
+    $("v-coach").classList.toggle("on", CURRENT === "coach");
+  } else {
+    $("v-coach").classList.add("on");
+  }
+});
 
 
 /* =====================================================================
@@ -2839,6 +2883,7 @@ function renderAll(){
   renderBoard(); renderIdeaEdges(); renderIdeas();
   renderPrepLock(); renderJournal(); renderCoach();
   buildClocks(); tickClocks(); measureHeader();
+  if(isDesktop()) $("v-coach").classList.add("on");
 }
 setInterval(tickClocks, 1000);
 
