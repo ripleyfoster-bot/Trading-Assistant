@@ -218,7 +218,7 @@ input[type=text].price{font-family:var(--f-data)}
 /* tab bar */
 nav{
   position:fixed;left:0;right:0;bottom:0;z-index:40;
-  display:grid;grid-template-columns:repeat(6,1fr);
+  display:grid;grid-template-columns:repeat(7,1fr);
   background:var(--card);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom);
 }
@@ -434,6 +434,59 @@ nav .ico{font-size:17px;line-height:1}
 
 #v-coach{padding:16px;max-width:900px;margin:0 auto}
 
+
+/* ---- accounts & risk ---- */
+.firm{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);padding:14px;margin-bottom:var(--gap)}
+.firm-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.firm-name{font-size:16px;font-weight:640;letter-spacing:-.2px}
+.stale{
+  font:600 10px/1 var(--f-data);letter-spacing:.6px;padding:5px 8px;border-radius:6px;
+  background:var(--caution-bg);color:var(--caution);border:1px solid var(--caution-line);white-space:nowrap;
+}
+.fresh{
+  font:600 10px/1 var(--f-data);letter-spacing:.6px;padding:5px 8px;border-radius:6px;
+  background:var(--card-2);color:var(--ink-3);border:1px solid var(--line);white-space:nowrap;
+}
+.acct{
+  border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--card-2);
+  padding:11px 12px;margin-top:9px;position:relative;overflow:hidden;
+}
+.acct::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ok)}
+.acct.tight::before{background:var(--caution)}
+.acct.danger::before{background:var(--off)}
+.acct.dead::before{background:var(--ink-3)}
+.acct-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.acct-name{font-size:14px;font-weight:600}
+.acct-meta{font:500 10px/1.4 var(--f-data);color:var(--ink-3);letter-spacing:.4px}
+.acct-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}
+.acct-nums div{font:600 14px/1.2 var(--f-data)}
+.acct-nums span{display:block;font:600 9px/1 var(--f-body);letter-spacing:.8px;color:var(--ink-3);margin-bottom:3px}
+.buffer-bar{height:5px;background:var(--line);border-radius:99px;margin-top:9px;overflow:hidden}
+.buffer-bar i{display:block;height:100%;background:var(--ok);transition:width .3s}
+.acct.tight .buffer-bar i{background:var(--caution)}
+.acct.danger .buffer-bar i{background:var(--off)}
+.binding{
+  border:1px solid var(--acc);background:var(--acc-soft);border-radius:var(--radius);
+  padding:13px 14px;margin-bottom:var(--gap);
+}
+.binding h3{margin:0 0 4px;font-size:15px;font-weight:640}
+.binding .big{font:700 20px/1.1 var(--f-data);margin:6px 0}
+.payout-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;font-size:13px}
+.payout-row + .payout-row{border-top:1px dashed var(--line)}
+.payout-row b{font-family:var(--f-data)}
+.warn-hard{
+  border:1px solid var(--off-line);background:var(--off-bg);color:var(--off);
+  border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;margin-top:10px;line-height:1.4;
+}
+.ok-note{
+  border:1px solid var(--ok-line);background:var(--ok-bg);color:var(--ok);
+  border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;margin-top:10px;line-height:1.4;
+}
+@media(max-width:620px){
+  nav button{font-size:10px}
+  nav .ico{font-size:15px}
+}
+
 details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0}
 </style>
 </head>
@@ -588,6 +641,13 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <div id="journalOut"></div>
 </section>
 
+<!-- ============================ RISK ============================ -->
+<section class="view" id="v-risk">
+  <h2>Accounts &amp; risk</h2>
+  <p class="sub">What you can lose today, and which account decides it.</p>
+  <div id="riskOut"></div>
+</section>
+
 <!-- ============================ SETTINGS ============================ -->
 <section class="view" id="v-set">
   <h2>Settings</h2>
@@ -678,6 +738,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <button data-go="board"><span class="ico">▤</span>Board<span class="dot"></span></button>
   <button data-go="plan"><span class="ico">◎</span>Ideas<span class="dot"></span></button>
   <button data-go="journal"><span class="ico">✎</span>Journal<span class="dot"></span></button>
+  <button data-go="risk"><span class="ico">◈</span>Risk<span class="dot"></span></button>
   <button data-go="set"><span class="ico">⚙</span>Settings<span class="dot"></span></button>
   <button data-go="coach"><span class="ico">✳</span>Coach<span class="dot"></span></button>
 </nav>
@@ -691,7 +752,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "2.3";
+var APP_VERSION = "3.0";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1680,13 +1741,14 @@ function go(name){
   }
   if(isDesktop()) document.body.classList.remove("coach-full");
   CURRENT = name;
-  ["prep","board","plan","journal","coach","set"].forEach(function(v){
+  ["prep","board","plan","journal","risk","coach","set"].forEach(function(v){
     $("v-" + v).classList.toggle("on", v === name);
   });
   syncNav(name);
   if(name === "board") renderBoard();
   if(name === "plan"){ renderIdeaEdges(); renderIdeas(); }
   if(name === "journal") renderJournal();
+  if(name === "risk") renderRisk();
   if(name === "coach") renderCoach();
   window.scrollTo(0,0);
 }
@@ -2255,6 +2317,12 @@ function dayContext(){
   }
   if((d.news || []).length){
     out.push("News: " + d.news.map(function(n){ return n.time + " " + n.what; }).join("; "));
+  }
+  var bud = dailyBudget();
+  if(bud){
+    out.push("Risk: binding account " + bud.account.label + ", room " + money(bud.state.buffer) +
+      ", daily budget " + money(bud.budget) + ", " + money(bud.left) + " left, " +
+      bud.taken + " of " + bud.attempts + " attempts used.");
   }
   if((d.trades || []).length){
     out.push("Trades today: " + d.trades.map(function(t){
@@ -2881,13 +2949,768 @@ function openEod(dayKey){
   WIZ.onClose = function(){ renderJournal(); renderAll(); };
 }
 
+
+/* =====================================================================
+   Accounts, drawdown and payout rules.
+
+   Everything here is DATA, not code. Prop firms move the goalposts —
+   Apex rewrote its entire ruleset on 1 March 2026 — so every figure is
+   editable, every firm carries the date its rules were last verified,
+   and adding a new firm is filling in a form, not a rebuild.
+
+   The templates below are starting points from public sources, not
+   authority. The firm's own dashboard is the authority.
+===================================================================== */
+
+var FIRM_TEMPLATES = [
+  {
+    key:"apex-eod",
+    name:"Apex Trader Funding — EOD Trailing",
+    note:"Apex 4.0, from 1 March 2026. EOD trailing is the default product.",
+    verifiedAt:"2026-08-16",
+    rules:{
+      drawdownType:"trailing-eod",
+      trailStops:true, trailStopOffset:100,
+      dllApplies:true,
+      minQualifyingDays:5, minDailyProfit:250,
+      consistencyPct:50, minPayout:500,
+      safetyNetOffset:2000, maxPayouts:6,
+      evalConsistency:false
+    }
+  },
+  {
+    key:"apex-intraday",
+    name:"Apex Trader Funding — Intraday Trailing",
+    note:"Threshold trails your peak unrealised balance in real time — a runner that pulls back can breach you.",
+    verifiedAt:"2026-08-16",
+    rules:{
+      drawdownType:"trailing-intraday",
+      trailStops:true, trailStopOffset:100,
+      dllApplies:false,
+      minQualifyingDays:5, minDailyProfit:250,
+      consistencyPct:50, minPayout:500,
+      safetyNetOffset:2000, maxPayouts:6,
+      evalConsistency:false
+    }
+  },
+  {
+    key:"propshop-futures",
+    name:"PropShop Trader — Futures",
+    note:"Benchmark-based. Intraday trailing or EOD chosen at signup; Real Prop switches to static.",
+    verifiedAt:"2026-08-16",
+    rules:{
+      drawdownType:"trailing-eod",
+      trailStops:false, trailStopOffset:0,
+      dllApplies:false,
+      minQualifyingDays:3, minDailyProfit:125,
+      consistencyPct:50, minPayout:0,
+      safetyNetOffset:0, maxPayouts:0,
+      evalConsistency:false
+    }
+  },
+  {
+    key:"blank",
+    name:"Blank firm",
+    note:"Start from nothing and fill in the rules yourself.",
+    verifiedAt:"",
+    rules:{
+      drawdownType:"static",
+      trailStops:false, trailStopOffset:0,
+      dllApplies:false,
+      minQualifyingDays:0, minDailyProfit:0,
+      consistencyPct:0, minPayout:0,
+      safetyNetOffset:0, maxPayouts:0,
+      evalConsistency:false
+    }
+  }
+];
+
+var DD_LABELS = {
+  "trailing-intraday":"Intraday trailing",
+  "trailing-eod":"End-of-day trailing",
+  "static":"Static"
+};
+
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+function firms(){ S.firms = S.firms || []; return S.firms; }
+function accounts(){ S.accounts = S.accounts || []; return S.accounts; }
+function riskCfg(){
+  S.risk = S.risk || { dailyPct:2, attempts:3, tickValue:5, groupLead:"", groupOn:false, followers:[] };
+  return S.risk;
+}
+
+function daysSince(iso){
+  if(!iso) return 9999;
+  var then = new Date(iso).getTime();
+  if(isNaN(then)) return 9999;
+  return Math.floor((Date.now() - then) / 86400000);
+}
+
+/* ---- the drawdown maths, per account ---- */
+function acctState(a){
+  var f = firms().filter(function(x){ return x.id === a.firmId; })[0];
+  var r = (f && f.rules) || {};
+  var start = +a.start || 0;
+  var dd = +a.dd || 0;
+  var peak = Math.max(+a.peak || start, start);
+  var bal = (a.balance === "" || a.balance == null) ? start : +a.balance;
+  var floor;
+
+  if(r.drawdownType === "static"){
+    floor = start - dd;
+  } else {
+    floor = peak - dd;
+    if(r.trailStops){
+      /* once the floor reaches start + offset it stops climbing */
+      var cap = start + (+r.trailStopOffset || 0);
+      if(floor > cap) floor = cap;
+    }
+  }
+  var buffer = bal - floor;
+  var safetyNet = (r.safetyNetOffset ? floor + (+r.safetyNetOffset) : null);
+  var pct = dd > 0 ? Math.max(0, Math.min(100, buffer / dd * 100)) : 0;
+  return {
+    firm: f, rules: r, start: start, dd: dd, peak: peak, bal: bal,
+    floor: floor, buffer: buffer, pct: pct, safetyNet: safetyNet,
+    dead: buffer <= 0
+  };
+}
+
+function activeAccounts(){
+  var g = riskCfg();
+  var all = accounts().filter(function(a){ return a.active !== false; });
+  if(!g.groupOn) return all.filter(function(a){ return a.id === g.groupLead; });
+  var ids = [g.groupLead].concat(g.followers || []);
+  return all.filter(function(a){ return ids.indexOf(a.id) > -1; });
+}
+
+/* The account with the least room is the one that decides the day. */
+function bindingAccount(){
+  var list = activeAccounts().map(function(a){
+    return { a: a, s: acctState(a) };
+  }).filter(function(x){ return !x.s.dead; });
+  if(!list.length) return null;
+  list.sort(function(p, q){ return p.s.buffer - q.s.buffer; });
+  return list[0];
+}
+
+function dailyBudget(){
+  var b = bindingAccount();
+  if(!b) return null;
+  var cfg = riskCfg();
+  var pct = +cfg.dailyPct || 0;
+  var budget = b.s.buffer * pct / 100;
+  var used = todayRisked();
+  return {
+    account: b.a, state: b.s,
+    budget: budget, used: used, left: Math.max(0, budget - used),
+    attempts: +cfg.attempts || 0,
+    taken: day().trades.length,
+    blown: used >= budget && budget > 0
+  };
+}
+
+/* Realised losses today, from the journal. */
+function todayRisked(){
+  var sum = 0;
+  (day().trades || []).forEach(function(t){
+    var r = parseFloat(String(t.result).replace(/[^0-9.\-]/g, ""));
+    if(!isNaN(r) && r < 0) sum += Math.abs(r);
+  });
+  return sum;
+}
+function todayNet(){
+  var sum = 0;
+  (day().trades || []).forEach(function(t){
+    var r = parseFloat(String(t.result).replace(/[^0-9.\-]/g, ""));
+    if(!isNaN(r)) sum += r;
+  });
+  return sum;
+}
+
+/* ---- payout position, per account ---- */
+function payoutState(a){
+  var s = acctState(a);
+  var r = s.rules || {};
+  var p = a.payout || { qualDays:0, periodProfit:0, largestDay:0, target:0, taken:0 };
+  var out = { rules:r, p:p, state:s, issues:[], ready:false };
+  if(!r.minQualifyingDays && !r.consistencyPct) return out;
+
+  var daysLeft = Math.max(0, (+r.minQualifyingDays || 0) - (+p.qualDays || 0));
+  if(daysLeft) out.issues.push(daysLeft + " more qualifying day" + (daysLeft === 1 ? "" : "s") +
+    " at " + money(r.minDailyProfit) + "+");
+
+  var target = +p.target || 0;
+  var largest = +p.largestDay || 0;
+  var total = +p.periodProfit || 0;
+
+  if(r.consistencyPct && largest > 0){
+    var maxAllowed = total * (r.consistencyPct / 100);
+    if(largest > maxAllowed){
+      var needed = largest / (r.consistencyPct / 100);
+      out.issues.push("consistency: your best day was " + money(largest) +
+        ", which needs total profit of " + money(needed) + " — you're at " + money(total));
+      out.consistencyBlocked = true;
+      out.neededTotal = needed;
+    }
+    /* the number that matters mid-session */
+    if(target > 0) out.maxDayForTarget = target * (r.consistencyPct / 100);
+  }
+
+  if(r.minPayout && total < r.minPayout){
+    out.issues.push("below the " + money(r.minPayout) + " minimum payout");
+  }
+  if(s.safetyNet != null && s.bal < s.safetyNet){
+    out.issues.push("balance is under the safety net of " + money(s.safetyNet) +
+      " — you can keep trading but can't withdraw");
+  }
+  if(r.maxPayouts && (+p.taken || 0) >= r.maxPayouts){
+    out.issues.push("this account has used all " + r.maxPayouts + " payouts");
+  }
+  out.ready = out.issues.length === 0;
+  return out;
+}
+
+function money(n){
+  var v = +n || 0;
+  return (v < 0 ? "-" : "") + "$" + Math.abs(v).toLocaleString("en-GB",
+    { minimumFractionDigits: Math.abs(v) % 1 ? 2 : 0, maximumFractionDigits:2 });
+}
+
+/* =====================================================================
+   Render
+===================================================================== */
+function renderRisk(){
+  var out = $("riskOut"); out.innerHTML = "";
+
+  if(!firms().length){
+    var e = el("div","empty");
+    e.appendChild(el("strong", null, "No firms yet"));
+    e.appendChild(el("span", null,
+      "Add the firms you trade with, then the accounts under them. Rules are yours to edit — the templates are a starting point, not gospel."));
+    out.appendChild(e);
+    out.appendChild(addFirmCard());
+    return;
+  }
+
+  out.appendChild(budgetCard());
+  firms().forEach(function(f){ out.appendChild(firmCard(f)); });
+  out.appendChild(addFirmCard());
+  out.appendChild(riskSettingsCard());
+}
+
+function budgetCard(){
+  var b = dailyBudget();
+  var c = el("div","binding");
+  if(!b){
+    c.appendChild(el("h3", null, "No account selected"));
+    c.appendChild(el("p","hint",
+      "Pick a lead account below — that's the one the day's budget is calculated from."));
+    return c;
+  }
+  c.appendChild(el("h3", null, "Today's budget"));
+  c.appendChild(el("p","hint",
+    "Binding account: " + b.account.label + " — the tightest in the group, so it sets the day."));
+  c.appendChild(el("div","big", money(b.left) + " left of " + money(b.budget)));
+
+  var line = el("p","hint");
+  line.textContent = b.taken + " of " + b.attempts + " attempts used · " +
+    money(b.used) + " lost so far today · net " + money(todayNet());
+  c.appendChild(line);
+
+  if(b.blown){
+    c.appendChild(el("div","warn-hard",
+      "Daily loss limit reached. That's the one wall with no door — the day is done."));
+  } else if(b.taken >= b.attempts && b.attempts){
+    c.appendChild(el("div","warn-hard",
+      "Attempts used up for the day."));
+  }
+
+  /* consistency ceiling: a good day can break a payout */
+  var ceilings = activeAccounts().map(function(a){
+    var ps = payoutState(a);
+    return ps.maxDayForTarget ? { a:a, max:ps.maxDayForTarget } : null;
+  }).filter(Boolean);
+  if(ceilings.length){
+    var net = todayNet();
+    var tightest = ceilings.sort(function(p,q){ return p.max - q.max; })[0];
+    if(net >= tightest.max){
+      c.appendChild(el("div","warn-hard",
+        "You're at " + money(net) + " today, past the " + money(tightest.max) +
+        " consistency ceiling on " + tightest.a.label +
+        ". Carrying on makes this day too big a share of the payout. Stop."));
+    } else if(net > tightest.max * 0.75){
+      c.appendChild(el("div","ok-note",
+        "Consistency ceiling on " + tightest.a.label + " is " + money(tightest.max) +
+        ". You're at " + money(net) + " — mind the gap."));
+    }
+  }
+  return c;
+}
+
+function firmCard(f){
+  var c = el("div","firm");
+  var top = el("div","firm-top");
+  var left = el("div");
+  left.appendChild(el("div","firm-name", f.name));
+  if(f.note) left.appendChild(el("div","acct-meta", f.note));
+  top.appendChild(left);
+
+  var age = daysSince(f.verifiedAt);
+  var badge = el("div", age > 30 ? "stale" : "fresh",
+    age > 500 ? "NEVER VERIFIED" : age > 30 ? "CHECK RULES" : "VERIFIED " + age + "D AGO");
+  top.appendChild(badge);
+  c.appendChild(top);
+
+  if(age > 30){
+    c.appendChild(el("div","warn-hard",
+      "These rules haven't been checked in " + (age > 500 ? "ever" : age + " days") +
+      ". Firms move the goalposts — verify against the dashboard before you rely on them."));
+  }
+
+  var row = el("div","cap-row");
+  var chk = el("button","cap-btn"); chk.type = "button"; chk.textContent = "Check for rule changes";
+  chk.onclick = function(){ checkFirmRules(f, chk); };
+  var edt = el("button","cap-btn plain"); edt.type = "button"; edt.textContent = "Edit rules";
+  edt.onclick = function(){ editFirm(f); };
+  var addA = el("button","cap-btn plain"); addA.type = "button"; addA.textContent = "Add account";
+  addA.onclick = function(){ addAccount(f); };
+  row.appendChild(chk); row.appendChild(edt); row.appendChild(addA);
+  c.appendChild(row);
+
+  var mine = accounts().filter(function(a){ return a.firmId === f.id; });
+  if(!mine.length){
+    c.appendChild(el("p","hint","No accounts under this firm yet."));
+  } else {
+    if(mine.length >= 5){
+      c.appendChild(el("div","warn-hard",
+        mine.length + " accounts here. Your own rule: five is the ceiling until a payout lands."));
+    }
+    mine.forEach(function(a){ c.appendChild(acctCard(a)); });
+  }
+  return c;
+}
+
+function acctCard(a){
+  var s = acctState(a);
+  var cls = s.dead ? "dead" : s.pct < 20 ? "danger" : s.pct < 45 ? "tight" : "";
+  var card = el("div","acct " + cls);
+
+  var top = el("div","acct-top");
+  var left = el("div");
+  left.appendChild(el("div","acct-name", a.label));
+  left.appendChild(el("div","acct-meta",
+    (a.phase || "eval").toUpperCase() + " · " + money(a.start) + " · " +
+    (DD_LABELS[s.rules.drawdownType] || "—") + " drawdown" +
+    (a.id === riskCfg().groupLead ? " · LEAD" : "")));
+  top.appendChild(left);
+  card.appendChild(top);
+
+  var nums = el("div","acct-nums");
+  [["BALANCE", money(s.bal)],["FLOOR", money(s.floor)],["ROOM", money(s.buffer)]].forEach(function(p){
+    var d = el("div");
+    d.appendChild(el("span", null, p[0]));
+    d.appendChild(document.createTextNode(p[1]));
+    nums.appendChild(d);
+  });
+  card.appendChild(nums);
+
+  var bar = el("div","buffer-bar");
+  var i = el("i"); i.style.width = s.pct + "%";
+  bar.appendChild(i); card.appendChild(bar);
+
+  if(s.dead){
+    card.appendChild(el("div","warn-hard","Breached. This account is gone."));
+  }
+  if(s.safetyNet != null && s.bal < s.safetyNet && !s.dead){
+    card.appendChild(el("div","ok-note",
+      "Under the safety net (" + money(s.safetyNet) + "). Trading is fine; withdrawals aren't."));
+  }
+
+  var ps = payoutState(a);
+  if(ps.issues.length){
+    var det = el("details"); det.style.marginTop = "8px";
+    det.appendChild(el("summary", null, "Payout: " + ps.issues.length + " thing" +
+      (ps.issues.length === 1 ? "" : "s") + " in the way"));
+    ps.issues.forEach(function(x){
+      var r = el("div","payout-row");
+      r.appendChild(el("span", null, x));
+      det.appendChild(r);
+    });
+    card.appendChild(det);
+  } else if(ps.rules.minQualifyingDays){
+    card.appendChild(el("div","ok-note","Payout conditions met."));
+  }
+
+  var row = el("div","cap-row");
+  var up = el("button","cap-btn plain"); up.type = "button"; up.textContent = "Update";
+  up.onclick = function(){ editAccount(a); };
+  row.appendChild(up);
+  var lead = el("button","cap-btn plain"); lead.type = "button";
+  lead.textContent = a.id === riskCfg().groupLead ? "Lead account" : "Make lead";
+  lead.onclick = function(){ riskCfg().groupLead = a.id; save(); renderRisk(); };
+  row.appendChild(lead);
+  var fol = el("button","cap-btn plain"); fol.type = "button";
+  var isF = (riskCfg().followers || []).indexOf(a.id) > -1;
+  fol.textContent = isF ? "In copy group" : "Add to copy group";
+  fol.onclick = function(){
+    var f = riskCfg().followers = riskCfg().followers || [];
+    var ix = f.indexOf(a.id);
+    if(ix > -1) f.splice(ix,1); else f.push(a.id);
+    save(); renderRisk();
+  };
+  row.appendChild(fol);
+  card.appendChild(row);
+  return card;
+}
+
+function addFirmCard(){
+  var c = el("div","card");
+  c.appendChild(el("h3", null, "Add a firm"));
+  c.appendChild(el("p","hint",
+    "Templates are starting points from public sources — check every figure against your own dashboard, then set the verified date."));
+  var sel = el("select"); sel.id = "tmplSel";
+  FIRM_TEMPLATES.forEach(function(t){ sel.appendChild(new Option(t.name, t.key)); });
+  c.appendChild(sel);
+  var b = el("button","btn wide"); b.type = "button"; b.textContent = "Add it";
+  b.style.marginTop = "10px";
+  b.onclick = function(){
+    var t = FIRM_TEMPLATES.filter(function(x){ return x.key === sel.value; })[0];
+    var f = {
+      id: uid(),
+      name: t.key === "blank" ? "New firm" : t.name,
+      note: t.note, verifiedAt: t.verifiedAt,
+      rules: JSON.parse(JSON.stringify(t.rules))
+    };
+    firms().push(f); save(); renderRisk(); editFirm(f);
+  };
+  c.appendChild(b);
+  return c;
+}
+
+function riskSettingsCard(){
+  var cfg = riskCfg();
+  var c = el("div","card");
+  c.appendChild(el("h3", null, "Your risk settings"));
+  c.appendChild(el("p","hint",
+    "Set before the session and left alone. Changes belong after the close, not during."));
+  var grid = el("div","levels-grid");
+  [["dailyPct","Daily risk % of room"],["attempts","Attempts per day"],
+   ["tickValue","$ per point per contract"]].forEach(function(f){
+    var box = el("div");
+    box.appendChild(el("label", null, f[1]));
+    var inp = el("input"); inp.type = "text"; inp.className = "price";
+    inp.value = cfg[f[0]];
+    inp.oninput = function(){ cfg[f[0]] = inp.value; save(); };
+    inp.onchange = function(){ renderRisk(); };
+    box.appendChild(inp); grid.appendChild(box);
+  });
+  c.appendChild(grid);
+
+  var lab = el("label", null, "Copy trading");
+  c.appendChild(lab);
+  var t = el("button","chip");
+  t.type = "button";
+  t.textContent = cfg.groupOn ? "Copy group ON" : "Copy group OFF — lead only";
+  t.setAttribute("aria-pressed", cfg.groupOn ? "true" : "false");
+  t.onclick = function(){ cfg.groupOn = !cfg.groupOn; save(); renderRisk(); };
+  c.appendChild(t);
+
+  /* size calculator — the whole point of derived sizing */
+  c.appendChild(el("h3", null, "Size a trade"));
+  c.appendChild(el("p","hint","Stop distance comes from structure. Size follows it, never the other way round."));
+  var g2 = el("div","levels-grid");
+  var stopIn = el("input"); stopIn.type = "text"; stopIn.className = "price";
+  stopIn.placeholder = "e.g. 6"; stopIn.id = "sizeStop";
+  var b1 = el("div"); b1.appendChild(el("label", null, "Stop distance (points)")); b1.appendChild(stopIn);
+  g2.appendChild(b1);
+  var outBox = el("div");
+  outBox.appendChild(el("label", null, "Contracts"));
+  var res = el("div","big"); res.id = "sizeOut"; res.textContent = "—";
+  outBox.appendChild(res);
+  g2.appendChild(outBox);
+  c.appendChild(g2);
+  stopIn.oninput = function(){
+    var b = dailyBudget();
+    var pts = parseFloat(stopIn.value);
+    if(!b || !pts || pts <= 0){ res.textContent = "—"; return; }
+    var perTrade = b.budget / (b.attempts || 1);
+    var perContract = pts * (+riskCfg().tickValue || 5);
+    var n = Math.floor(perTrade / perContract);
+    res.textContent = n + (n === 0 ? "  — stop's too wide for the budget" : "");
+  };
+  return c;
+}
+
+/* ---- editors, all built from the same field list so adding a rule
+        to a firm means adding a line here, not rewriting a screen ---- */
+var FIRM_FIELDS = [
+  { k:"drawdownType", label:"Drawdown type", type:"select",
+    opts:[["trailing-intraday","Intraday trailing"],["trailing-eod","End-of-day trailing"],["static","Static"]] },
+  { k:"trailStops", label:"Trailing stops once it reaches start + offset", type:"bool" },
+  { k:"trailStopOffset", label:"…that offset ($)", type:"num" },
+  { k:"dllApplies", label:"Has a separate daily loss limit", type:"bool" },
+  { k:"minQualifyingDays", label:"Qualifying days needed per payout", type:"num" },
+  { k:"minDailyProfit", label:"Minimum profit for a day to qualify ($)", type:"num" },
+  { k:"consistencyPct", label:"Consistency: max % of payout from one day", type:"num" },
+  { k:"minPayout", label:"Minimum payout amount ($)", type:"num" },
+  { k:"safetyNetOffset", label:"Safety net above the floor ($)", type:"num" },
+  { k:"maxPayouts", label:"Maximum payouts per account (0 = no cap)", type:"num" }
+];
+
+function editFirm(f){
+  WIZ.steps = [{
+    say: "Editing the rules for " + f.name,
+    render: function(box){
+      box.appendChild(el("h2","wiz-q", "Rules — " + f.name));
+      box.appendChild(el("p","wiz-sub",
+        "Every one of these is editable. When a firm changes its terms, you change it here and nothing else breaks."));
+
+      box.appendChild(el("label", null, "Firm name"));
+      var nm = el("input"); nm.type = "text"; nm.value = f.name;
+      nm.oninput = function(){ f.name = nm.value; save(); };
+      box.appendChild(nm);
+
+      box.appendChild(el("label", null, "Note to yourself"));
+      var nt = el("textarea"); nt.value = f.note || "";
+      nt.oninput = function(){ f.note = nt.value; save(); };
+      box.appendChild(nt);
+
+      FIRM_FIELDS.forEach(function(fd){
+        box.appendChild(el("label", null, fd.label));
+        var inp;
+        if(fd.type === "select"){
+          inp = el("select");
+          fd.opts.forEach(function(o){ inp.appendChild(new Option(o[1], o[0])); });
+          inp.value = f.rules[fd.k] || fd.opts[0][0];
+          inp.onchange = function(){ f.rules[fd.k] = inp.value; save(); };
+        } else if(fd.type === "bool"){
+          inp = el("button","chip"); inp.type = "button";
+          var set = function(){
+            inp.textContent = f.rules[fd.k] ? "Yes" : "No";
+            inp.setAttribute("aria-pressed", f.rules[fd.k] ? "true" : "false");
+          };
+          set();
+          inp.onclick = function(){ f.rules[fd.k] = !f.rules[fd.k]; save(); set(); };
+        } else {
+          inp = el("input"); inp.type = "text"; inp.className = "price";
+          inp.value = f.rules[fd.k] != null ? f.rules[fd.k] : "";
+          inp.oninput = function(){ f.rules[fd.k] = inp.value === "" ? 0 : +inp.value; save(); };
+        }
+        box.appendChild(inp);
+      });
+
+      box.appendChild(el("label", null, "Rules verified on (YYYY-MM-DD)"));
+      var vd = el("input"); vd.type = "text"; vd.className = "price";
+      vd.value = f.verifiedAt || "";
+      vd.oninput = function(){ f.verifiedAt = vd.value; save(); };
+      box.appendChild(vd);
+      var today = el("button","cap-btn plain"); today.type = "button";
+      today.textContent = "Verified today"; today.style.marginTop = "8px";
+      today.onclick = function(){
+        var d = new Date();
+        f.verifiedAt = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+        vd.value = f.verifiedAt; save(); toast("Marked as verified today");
+      };
+      box.appendChild(today);
+
+      var del = el("button","wiz-skip","Delete this firm and its accounts");
+      del.type = "button";
+      del.onclick = function(){
+        if(!confirm("Delete " + f.name + " and every account under it?")) return;
+        S.accounts = accounts().filter(function(a){ return a.firmId !== f.id; });
+        S.firms = firms().filter(function(x){ return x.id !== f.id; });
+        save(); closeWiz();
+      };
+      box.appendChild(del);
+    },
+    ready: function(){ return true; },
+    need: ""
+  }];
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+  WIZ.onClose = function(){ renderRisk(); };
+}
+
+function addAccount(f){
+  var a = {
+    id: uid(), firmId: f.id, label: f.name.split("—")[0].trim() + " #" + (accounts().length + 1),
+    phase:"eval", start:50000, dd:2500, peak:50000, balance:50000,
+    instrument:"futures", active:true,
+    payout:{ qualDays:0, periodProfit:0, largestDay:0, target:0, taken:0 }
+  };
+  accounts().push(a); save();
+  if(!riskCfg().groupLead) riskCfg().groupLead = a.id;
+  editAccount(a);
+}
+
+var ACCT_FIELDS = [
+  { k:"label", label:"Name it", type:"text" },
+  { k:"phase", label:"Phase", type:"select", opts:[["eval","Evaluation"],["funded","Funded / PA"]] },
+  { k:"start", label:"Starting balance ($)", type:"num" },
+  { k:"dd", label:"Drawdown amount ($)", type:"num" },
+  { k:"peak", label:"Highest balance reached ($)", type:"num" },
+  { k:"balance", label:"Balance now ($)", type:"num" },
+  { k:"instrument", label:"Instrument", type:"select", opts:[["futures","Futures"],["stocks","Stocks"]] }
+];
+var PAYOUT_FIELDS = [
+  { k:"qualDays", label:"Qualifying days banked" },
+  { k:"periodProfit", label:"Profit since last payout ($)" },
+  { k:"largestDay", label:"Biggest single day in that period ($)" },
+  { k:"target", label:"Payout you're aiming at ($)" },
+  { k:"taken", label:"Payouts already taken" }
+];
+
+function editAccount(a){
+  WIZ.steps = [{
+    say: "Updating " + a.label,
+    render: function(box){
+      var s = acctState(a);
+      box.appendChild(el("h2","wiz-q", a.label));
+      box.appendChild(el("p","wiz-sub",
+        "Room left: " + money(s.buffer) + " · floor at " + money(s.floor) +
+        ". Keep balance and peak current — everything else is derived from them."));
+
+      ACCT_FIELDS.forEach(function(fd){
+        box.appendChild(el("label", null, fd.label));
+        var inp;
+        if(fd.type === "select"){
+          inp = el("select");
+          fd.opts.forEach(function(o){ inp.appendChild(new Option(o[1], o[0])); });
+          inp.value = a[fd.k];
+          inp.onchange = function(){ a[fd.k] = inp.value; save(); };
+        } else {
+          inp = el("input"); inp.type = "text";
+          if(fd.type === "num") inp.className = "price";
+          inp.value = a[fd.k] != null ? a[fd.k] : "";
+          inp.oninput = function(){
+            a[fd.k] = fd.type === "num" ? (inp.value === "" ? 0 : +inp.value) : inp.value;
+            save();
+          };
+        }
+        box.appendChild(inp);
+      });
+
+      var net = todayNet();
+      if(net !== 0){
+        var apply = el("button","cap-btn"); apply.type = "button";
+        apply.style.marginTop = "12px";
+        apply.textContent = "Apply today's " + money(net) + " to this account";
+        apply.onclick = function(){
+          a.balance = (+a.balance || 0) + net;
+          if(a.balance > (+a.peak || 0)) a.peak = a.balance;
+          if(net > 0){
+            a.payout = a.payout || {};
+            a.payout.periodProfit = (+a.payout.periodProfit || 0) + net;
+            if(net > (+a.payout.largestDay || 0)) a.payout.largestDay = net;
+            var f = firms().filter(function(x){ return x.id === a.firmId; })[0];
+            var min = f && f.rules ? (+f.rules.minDailyProfit || 0) : 0;
+            if(net >= min && min > 0) a.payout.qualDays = (+a.payout.qualDays || 0) + 1;
+          }
+          save(); wizRerender(); toast("Applied");
+        };
+        box.appendChild(apply);
+      }
+
+      box.appendChild(el("h2","wiz-q","Payout position"));
+      box.appendChild(el("p","wiz-sub","Where this account stands against the firm's payout conditions."));
+      a.payout = a.payout || {};
+      PAYOUT_FIELDS.forEach(function(fd){
+        box.appendChild(el("label", null, fd.label));
+        var inp = el("input"); inp.type = "text"; inp.className = "price";
+        inp.value = a.payout[fd.k] != null ? a.payout[fd.k] : 0;
+        inp.oninput = function(){ a.payout[fd.k] = inp.value === "" ? 0 : +inp.value; save(); };
+        box.appendChild(inp);
+      });
+
+      var ps = payoutState(a);
+      if(ps.maxDayForTarget){
+        box.appendChild(el("div","ok-note",
+          "With a " + money(a.payout.target) + " payout in mind, no single day may contribute more than " +
+          money(ps.maxDayForTarget) + ". Past that, a good day becomes a blocked payout."));
+      }
+      ps.issues.forEach(function(x){
+        box.appendChild(el("div","warn-hard", x));
+      });
+
+      var del = el("button","wiz-skip","Delete this account");
+      del.type = "button";
+      del.onclick = function(){
+        if(!confirm("Delete " + a.label + "?")) return;
+        S.accounts = accounts().filter(function(x){ return x.id !== a.id; });
+        if(riskCfg().groupLead === a.id) riskCfg().groupLead = "";
+        save(); closeWiz();
+      };
+      box.appendChild(del);
+    },
+    ready: function(){ return true; },
+    need: ""
+  }];
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+  WIZ.onClose = function(){ renderRisk(); };
+}
+
+/* ---- monthly rule check, via Claude with search ---- */
+async function checkFirmRules(f, btn){
+  btn.disabled = true; btn.textContent = "Checking…";
+  try{
+    var r = f.rules;
+    var text = await callClaude(
+      "You research prop trading firm rules. Be precise, cite what you find, and say plainly when you cannot confirm something. Never guess a number.",
+      "Check the current published rules for the prop firm '" + f.name + "'.\n\n" +
+      "These are the figures I currently have stored. For each one, say whether it still matches, " +
+      "has changed (give the new value), or you could not confirm:\n" +
+      "- Drawdown type: " + r.drawdownType + "\n" +
+      "- Qualifying days per payout: " + r.minQualifyingDays + "\n" +
+      "- Minimum daily profit to qualify: $" + r.minDailyProfit + "\n" +
+      "- Consistency rule: " + r.consistencyPct + "% max from one day\n" +
+      "- Minimum payout: $" + r.minPayout + "\n" +
+      "- Safety net above the floor: $" + r.safetyNetOffset + "\n" +
+      "- Maximum payouts per account: " + r.maxPayouts + "\n\n" +
+      "Also flag any NEW rule that has appeared recently and any rule that has been removed. " +
+      "Keep it under 200 words, plain prose, no preamble. End with the date of the most recent " +
+      "rule change you can find.",
+      { search:true }
+    );
+    day().coach = day().coach || [];
+    day().coach.push({ role:"user", text:"Check " + f.name + " rules for changes" });
+    day().coach.push({ role:"assistant", text: text.trim() +
+      "\n\n— Verify against the firm's own dashboard before changing anything. Then edit the rules and set the verified date." });
+    save();
+    go("coach");
+    toast("Findings are in the Coach tab");
+  }catch(e){
+    toast(e.message === "no-key" ? "Add your API key in Settings"
+        : "Couldn't check just now — " + e.message.slice(0,60));
+  }
+  btn.disabled = false; btn.textContent = "Check for rule changes";
+}
+
+/* nudge once a month, without nagging */
+function ruleStaleNudge(){
+  var stale = firms().filter(function(f){ return daysSince(f.verifiedAt) > 30; });
+  if(!stale.length) return;
+  var last = S.lastStaleNudge || "";
+  var thisMonth = new Date().toISOString().slice(0,7);
+  if(last === thisMonth) return;
+  S.lastStaleNudge = thisMonth; save();
+  toast(stale.length + " firm" + (stale.length === 1 ? "'s" : "s'") + " rules need re-checking this month");
+}
+
 function renderAll(){
   day();
   applyTheme(); dstCheck(); renderHeader();
   renderFocus(); renderNews(); renderViews(); renderFacts();
   renderLevels(); renderSteps(); renderSettings();
   renderBoard(); renderIdeaEdges(); renderIdeas();
-  renderPrepLock(); renderJournal(); renderCoach();
+  renderPrepLock(); renderJournal(); renderRisk(); renderCoach();
+  ruleStaleNudge();
   buildClocks(); tickClocks(); measureHeader();
   if(isDesktop()) $("v-coach").classList.add("on");
 }
