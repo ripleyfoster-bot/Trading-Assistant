@@ -378,13 +378,19 @@ nav .ico{font-size:17px;line-height:1}
   #v-coach{
     display:flex !important;flex-direction:column;
     position:fixed;right:0;top:var(--hdr-h,96px);bottom:0;width:40%;
+    max-width:none;                      /* the mobile 900px cap must not apply here */
     overflow-y:auto;border-left:1px solid var(--line);
     background:var(--bg);padding:16px 18px;margin:0;
   }
   #v-coach .chat{flex:1;overflow-y:auto}
   #v-coach .chat-input{position:sticky;bottom:0;background:var(--bg);padding-top:6px}
   body.coach-full main{display:none}
-  body.coach-full #v-coach{width:calc(100% - 150px);padding:20px 26px}
+  body.coach-full #v-coach{width:calc(100% - 150px);max-width:none;padding:20px 26px}
+  body.coach-full #v-coach .chat,
+  body.coach-full #v-coach .chat-input,
+  body.coach-full #v-coach h2,
+  body.coach-full #v-coach .sub{max-width:900px;margin-left:auto;margin-right:auto;width:100%}
+  body.coach-full #v-coach .msg{max-width:70%}
   #v-coach h2{margin-top:0}
 }
 
@@ -685,7 +691,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "2.2";
+var APP_VERSION = "2.3";
 var KEY = "ta_wpa_1";
 var S = load();
 
