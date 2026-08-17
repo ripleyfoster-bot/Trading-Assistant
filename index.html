@@ -348,6 +348,21 @@ nav .ico{font-size:17px;line-height:1}
   pointer-events:none;
 }
 .clockbar.mirror{flex-direction:row-reverse}
+/* Narrow screens have no room to overlay the clocks across the title,
+   so they drop onto their own row and the bar gets deeper to suit. */
+@media(max-width:999px){
+  .h-row{flex-wrap:wrap;row-gap:2px}
+  h1{flex:1 1 auto}
+  .clockbar{
+    position:static;order:3;width:100%;
+    justify-content:center;gap:22px;
+    margin-top:4px;pointer-events:auto;
+  }
+  .clockbar .h-date{padding-bottom:11px}
+}
+@media(max-width:400px){
+  .clockbar{gap:12px}
+}
 .clockbar .h-date{white-space:nowrap;padding-bottom:11px}
 .clock{text-align:center}
 .clock .digits{display:flex;gap:3px;align-items:center}
@@ -790,7 +805,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "3.5";
+var APP_VERSION = "3.6";
 var KEY = "ta_wpa_1";
 var S = load();
 
