@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12161b">
+<link rel="manifest" href="./manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Trading Assistant</title>
@@ -805,7 +806,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "3.6";
+var APP_VERSION = "3.9";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -3073,8 +3074,10 @@ var FIRM_TEMPLATES = [
   {
     key:"apex-eod",
     name:"Apex Trader Funding — EOD Trailing",
-    note:"Apex 4.0, from 1 March 2026. EOD trailing is the default product.",
-    verifiedAt:"2026-08-16",
+    note:"Apex 4.0, from 1 March 2026. Defaults are the 50K: $2,000 max drawdown, $3,000 profit target, 6 mini / 60 micro. Change the size and these change with it.",
+    verifiedAt:"2026-08-17",
+    acctDefaults:{ start:50000, dd:2000, peak:50000, balance:50000,
+                   profitTarget:3000, contractLimit:60 },
     rules:{
       drawdownType:"trailing-eod",
       trailStops:true, trailStopOffset:100,
@@ -3088,8 +3091,10 @@ var FIRM_TEMPLATES = [
   {
     key:"apex-intraday",
     name:"Apex Trader Funding — Intraday Trailing",
-    note:"Threshold trails your peak unrealised balance in real time — a runner that pulls back can breach you.",
-    verifiedAt:"2026-08-16",
+    note:"Threshold trails your peak unrealised balance in real time — a runner that pulls back can breach you. 50K defaults: $2,000 drawdown, $3,000 target, 6 mini / 60 micro, 1 day minimum to pass.",
+    verifiedAt:"2026-08-17",
+    acctDefaults:{ start:50000, dd:2000, peak:50000, balance:50000,
+                   profitTarget:3000, contractLimit:60 },
     rules:{
       drawdownType:"trailing-intraday",
       trailStops:true, trailStopOffset:100,
@@ -3097,6 +3102,23 @@ var FIRM_TEMPLATES = [
       minQualifyingDays:5, minDailyProfit:200,
       consistencyPct:50, minPayout:500,
       safetyNetOffset:2000, maxPayouts:6,
+      evalConsistency:false
+    }
+  },
+  {
+    key:"apex-live",
+    name:"Apex — Live Prop Program",
+    note:"Live dept, from Apex's FAQ: $0 start, $3,000 EOD trailing, locks at +$100 once profit hits $3,100. Payouts daily, $500 min, only above the $3,100 safety net. No consistency or qualifying days at Level 1. Level DLLs: none / $5k / $10k. Flat by 4:50pm ET (21:50 UK), 10 mini / 100 micro at L1.",
+    verifiedAt:"2026-08-17",
+    acctDefaults:{ start:0, dd:3000, peak:0, balance:0,
+                   profitTarget:0, contractLimit:100 },
+    rules:{
+      drawdownType:"trailing-eod",
+      trailStops:true, trailStopOffset:100,
+      dllApplies:false,
+      minQualifyingDays:0, minDailyProfit:0,
+      consistencyPct:0, minPayout:500,
+      safetyNetOffset:3000, maxPayouts:0,
       evalConsistency:false
     }
   },
@@ -3490,6 +3512,7 @@ function addFirmCard(){
       id: uid(),
       name: t.key === "blank" ? "New firm" : t.name,
       note: t.note, verifiedAt: t.verifiedAt,
+      acctDefaults: t.acctDefaults || null,
       rules: JSON.parse(JSON.stringify(t.rules))
     };
     firms().push(f); save(); renderRisk(); editFirm(f);
@@ -3540,14 +3563,30 @@ function riskSettingsCard(){
   outBox.appendChild(res);
   g2.appendChild(outBox);
   c.appendChild(g2);
+  var capNote = el("p","hint"); capNote.id = "sizeNote";
+  c.appendChild(capNote);
   stopIn.oninput = function(){
     var b = dailyBudget();
     var pts = parseFloat(stopIn.value);
+    capNote.textContent = "";
     if(!b || !pts || pts <= 0){ res.textContent = "—"; return; }
     var perTrade = b.budget / (b.attempts || 1);
     var perContract = pts * (+riskCfg().tickValue || 5);
     var n = Math.floor(perTrade / perContract);
+
+    /* the firm's contract cap binds too — and the tightest one wins */
+    var caps = activeAccounts()
+      .map(function(a){ return +a.contractLimit || 0; })
+      .filter(function(x){ return x > 0; });
+    if(caps.length){
+      var cap = Math.min.apply(null, caps);
+      if(n > cap){
+        capNote.textContent = "Risk allows " + n + ", but the contract limit caps you at " + cap + ".";
+        n = cap;
+      }
+    }
     res.textContent = n + (n === 0 ? "  — stop's too wide for the budget" : "");
+    if(n === 0) capNote.textContent = "Either the stop is too wide or there isn't enough room left today.";
   };
   return c;
 }
@@ -3645,10 +3684,13 @@ function editFirm(f){
 }
 
 function addAccount(f){
+  var d0 = f.acctDefaults || { start:50000, dd:2000, peak:50000, balance:50000 };
   var a = {
     id: uid(), firmId: f.id, label: f.name.split("—")[0].trim() + " #" + (accounts().length + 1),
-    phase:"eval", start:50000, dd:2500, peak:50000, balance:50000,
-    acctNo:"", minPayoutBalance:0, profitTarget:0,
+    phase:"eval", start:d0.start, dd:d0.dd, peak:d0.peak, balance:d0.balance,
+    acctNo:"", minPayoutBalance:0,
+    profitTarget: d0.profitTarget || 0,
+    contractLimit: d0.contractLimit || 0,
     instrument:"futures", active:true,
     payout:{ qualDays:0, periodProfit:0, largestDay:0, target:0, taken:0 }
   };
@@ -3667,7 +3709,8 @@ var ACCT_FIELDS = [
   { k:"instrument", label:"Instrument", type:"select", opts:[["futures","Futures"],["stocks","Stocks"]] },
   { k:"acctNo", label:"Account number", type:"text" },
   { k:"minPayoutBalance", label:"Min. payout balance, from the dashboard ($)", type:"num" },
-  { k:"profitTarget", label:"Profit target ($)", type:"num" }
+  { k:"profitTarget", label:"Profit target ($)", type:"num" },
+  { k:"contractLimit", label:"Max contracts (micros)", type:"num" }
 ];
 var PAYOUT_FIELDS = [
   { k:"qualDays", label:"Qualifying days banked" },
@@ -3878,8 +3921,11 @@ async function scanAccount(a, btn, refresh){
     "Return ONLY this JSON, no prose, no code fences. Use plain numbers with no currency " +
     "symbols or commas. Omit any field you cannot read:\n" +
     '{"acctNo":"","start":0,"balance":0,"minPayoutBalance":0,"totalProfit":0,' +
-    '"profitTarget":0,"daysTraded":0,"phase":"eval|funded",' +
+    '"profitTarget":0,"daysTraded":0,"phase":"eval|funded","dd":0,"contractLimit":0,' +
     '"minQualifyingDays":0,"minDailyProfit":0,"consistencyPct":0,"unsure":[]}\n\n' +
+    "If this is a product/spec page rather than a live account, read 'Max Drawdown' into dd, " +
+    "'Profit Target' into profitTarget, 'Starting Capital' into start, and the micro figure " +
+    "from 'Max Contracts' (e.g. '6 mini / 60 micro' gives 60) into contractLimit.\n\n" +
     "Notes: 'Initial Balance' is start. 'Current Balance' is balance. " +
     "'Min. Payout Balance' is minPayoutBalance. If the account number begins with PA it is a " +
     "funded Performance Account, otherwise it is an evaluation. " +
@@ -3913,7 +3959,9 @@ function acctProposalBox(a, refresh){
     ["start","Starting balance", true],
     ["balance","Balance now", true],
     ["minPayoutBalance","Min. payout balance", true],
-    ["profitTarget","Profit target", true]
+    ["profitTarget","Profit target", true],
+    ["dd","Max drawdown", true],
+    ["contractLimit","Max contracts (micros)", false]
   ];
   acctMap.forEach(function(m){
     var v = p[m[0]];
