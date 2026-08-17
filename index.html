@@ -340,7 +340,15 @@ nav .ico{font-size:17px;line-height:1}
 
 /* ---- header flip clocks ---- */
 .h-row{flex-wrap:wrap}
-.clocks{display:flex;gap:16px;align-items:center;margin:0 auto}
+.h-row{position:relative;align-items:center}
+.clockbar{
+  position:absolute;left:0;right:0;
+  display:flex;justify-content:center;align-items:center;
+  gap:var(--clock-gap,26px);
+  pointer-events:none;
+}
+.clockbar.mirror{flex-direction:row-reverse}
+.clockbar .h-date{white-space:nowrap;padding-bottom:11px}
 .clock{text-align:center}
 .clock .digits{display:flex;gap:3px;align-items:center}
 .flip{
@@ -504,9 +512,8 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
 <header>
   <div class="h-row">
     <h1>Trading Assistant</h1>
-    <div class="clocks" id="clocks"></div>
-    <span class="h-date" id="hdrDate"></span>
-    <span class="h-date" id="hdrVer" style="opacity:.55;margin-left:8px"></span>
+    <div class="clockbar" id="clocks"></div>
+    <span class="h-date" id="hdrVer" style="opacity:.55"></span>
   </div>
   <div class="prog"><i id="hdrProg"></i></div>
   <div id="dstBanner"></div>
@@ -763,7 +770,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "3.3";
+var APP_VERSION = "3.4";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1079,6 +1086,7 @@ function toast(msg){
 
 function applySide(){
   document.body.classList.toggle("coach-left", S.coachSide === "left");
+  setTimeout(placeClocks, 30);
 }
 
 function applyTheme(){
@@ -1752,6 +1760,7 @@ function go(name){
     panel.style.display = "flex";
     renderCoach();
     syncNav(full ? "coach" : CURRENT);
+    setTimeout(placeClocks, 30);
     setTimeout(function(){ $("chatIn").focus(); }, 60);
     return;
   }
@@ -2439,18 +2448,54 @@ function buildClocks(){
   var c = $("clocks");
   if(!c || c.dataset.built) return;
   c.dataset.built = "1";
-  [["ckL","LOCAL"],["ckN","NEW YORK"]].forEach(function(k){
+  var face = function(k, label){
     var box = el("div","clock");
     var d = el("div","digits");
     ["h","m","s"].forEach(function(p, i){
       if(i) d.appendChild(el("span","col",":"));
-      var f = el("span","flip","00"); f.id = k[0] + "-" + p;
+      var f = el("span","flip","00"); f.id = k + "-" + p;
       d.appendChild(f);
     });
     box.appendChild(d);
-    box.appendChild(el("div","lab", k[1]));
-    c.appendChild(box);
-  });
+    box.appendChild(el("div","lab", label));
+    return box;
+  };
+  c.appendChild(face("ckL","LOCAL"));
+  var dt = el("span","h-date"); dt.id = "hdrDate";
+  c.appendChild(dt);
+  c.appendChild(face("ckN","NEW YORK"));
+  placeClocks();
+}
+
+/* Centre the date in the header bar, then sit LOCAL over the middle of
+   the content panel. NEW YORK mirrors it on the far side of the date.
+   If the coach is on the left, the panel is on the right — so flip. */
+function placeClocks(){
+  var bar = $("clocks");
+  if(!bar || !bar.dataset.built) return;
+  var mainEl = document.querySelector("main");
+  if(!isDesktop() || !mainEl || document.body.classList.contains("coach-full")){
+    bar.classList.remove("mirror");
+    bar.style.setProperty("--clock-gap", "26px");
+    return;
+  }
+  var bRect = bar.getBoundingClientRect();
+  var mRect = mainEl.getBoundingClientRect();
+  if(!bRect.width || !mRect.width) return;
+
+  var barCentre = bRect.left + bRect.width / 2;
+  var panelCentre = mRect.left + mRect.width / 2;
+  var d = barCentre - panelCentre;              /* + when the panel is left of centre */
+
+  bar.classList.toggle("mirror", d < 0);
+
+  var faces = bar.querySelectorAll(".clock");
+  var dateEl = $("hdrDate");
+  if(!faces.length || !dateEl) return;
+  var half = (faces[0].offsetWidth + dateEl.offsetWidth) / 2;
+  var gap = Math.abs(d) - half;
+  if(!isFinite(gap) || gap < 18) gap = 18;
+  bar.style.setProperty("--clock-gap", Math.round(gap) + "px");
 }
 function setClock(prefix, tz){
   var parts = new Intl.DateTimeFormat("en-GB",
@@ -2468,7 +2513,7 @@ function measureHeader(){
   if(h) document.documentElement.style.setProperty("--hdr-h", h.offsetHeight + "px");
 }
 window.addEventListener("resize", function(){
-  measureHeader();
+  measureHeader(); placeClocks();
   if(!isDesktop()){
     document.body.classList.remove("coach-full");
     $("v-coach").classList.toggle("on", CURRENT === "coach");
@@ -3921,7 +3966,7 @@ function renderAll(){
   renderBoard(); renderIdeaEdges(); renderIdeas();
   renderPrepLock(); renderJournal(); renderRisk(); renderCoach();
   ruleStaleNudge();
-  buildClocks(); tickClocks(); measureHeader();
+  buildClocks(); tickClocks(); measureHeader(); placeClocks();
   if(isDesktop()) $("v-coach").classList.add("on");
 }
 setInterval(tickClocks, 1000);
