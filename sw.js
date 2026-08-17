@@ -4,7 +4,7 @@
    All alerts route through one notify path later, so the delivery
    mechanism can be swapped for push without touching the app. */
 
-var CACHE = "ta-wpa-v3-0";
+var CACHE = "ta-wpa-v3-3";
 var SHELL = ["./", "./index.html"];
 
 self.addEventListener("install", function(e){
