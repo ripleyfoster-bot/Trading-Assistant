@@ -393,6 +393,26 @@ nav .ico{font-size:17px;line-height:1}
   #v-coach .chat{flex:1;overflow-y:auto}
   #v-coach .chat-input{position:sticky;bottom:0;background:var(--bg);padding-top:6px}
   body.coach-full main{display:none}
+  /* Wide screens read top-to-bottom, not side-to-side. Bubbles that
+     alternate edges make you track left and right like a tennis match,
+     so blocks stack full width with the speaker named instead. */
+  #v-coach .msg{
+    max-width:none;align-self:stretch;width:100%;
+    border-radius:var(--radius);padding:12px 15px;
+  }
+  #v-coach .msg::before{
+    content:attr(data-who);display:block;
+    font:700 9px/1 var(--f-body);letter-spacing:1.3px;
+    color:var(--ink-3);margin-bottom:7px;
+  }
+  #v-coach .msg.me{
+    background:var(--acc-soft);color:var(--ink);
+    border:1px solid var(--acc);border-bottom-right-radius:var(--radius);
+  }
+  #v-coach .msg.me::before{color:var(--acc)}
+  #v-coach .msg.ai{border-bottom-left-radius:var(--radius)}
+  #v-coach .chat{gap:12px}
+
   /* coach on the left instead — mirror the whole split */
   body.coach-left main{margin:0 0 0 calc(150px + 40%)}
   body.coach-left #v-coach{
@@ -770,7 +790,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "3.4";
+var APP_VERSION = "3.5";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1118,8 +1138,11 @@ function dstCheck(){
 
 function renderHeader(){
   var d = new Date(S.currentDay || todayKey());
-  $("hdrDate").textContent = new Intl.DateTimeFormat("en-GB",
-    {weekday:"short", day:"numeric", month:"short"}).format(d).toUpperCase();
+  var dt = $("hdrDate");                 /* built with the clocks, so may not exist yet */
+  if(dt){
+    dt.textContent = new Intl.DateTimeFormat("en-GB",
+      {weekday:"short", day:"numeric", month:"short"}).format(d).toUpperCase();
+  }
   $("hdrProg").style.width = prepPercent() + "%";
   $("hdrVer").textContent = "v" + APP_VERSION;
 }
@@ -2389,6 +2412,7 @@ function renderCoach(){
   }
   chat.forEach(function(m){
     var b = el("div","msg " + (m.role === "user" ? "me" : "ai"), m.text);
+    b.dataset.who = m.role === "user" ? "YOU" : "COACH";
     if(m.role === "assistant"){
       var s = el("button","speak","Read aloud"); s.type = "button";
       s.onclick = function(){ speak(m.text); };
@@ -3958,15 +3982,24 @@ function acctProposalBox(a, refresh){
   return box;
 }
 
+function safely(name, fn){
+  try{ fn(); }
+  catch(e){ console.error(name + " failed:", e); }
+}
+
 function renderAll(){
   day();
-  applyTheme(); applySide(); dstCheck(); renderHeader();
-  renderFocus(); renderNews(); renderViews(); renderFacts();
-  renderLevels(); renderSteps(); renderSettings();
-  renderBoard(); renderIdeaEdges(); renderIdeas();
-  renderPrepLock(); renderJournal(); renderRisk(); renderCoach();
-  ruleStaleNudge();
-  buildClocks(); tickClocks(); measureHeader(); placeClocks();
+  applyTheme(); applySide(); buildClocks(); dstCheck(); renderHeader();
+  /* each panel is wrapped so a fault in one can't blank the others */
+  safely("focus", renderFocus); safely("news", renderNews);
+  safely("views", renderViews); safely("facts", renderFacts);
+  safely("levels", renderLevels); safely("steps", renderSteps);
+  safely("settings", renderSettings);
+  safely("board", renderBoard); safely("ideaEdges", renderIdeaEdges);
+  safely("ideas", renderIdeas); safely("prepLock", renderPrepLock);
+  safely("journal", renderJournal); safely("risk", renderRisk);
+  safely("coach", renderCoach); safely("nudge", ruleStaleNudge);
+  tickClocks(); measureHeader(); placeClocks();
   if(isDesktop()) $("v-coach").classList.add("on");
 }
 setInterval(tickClocks, 1000);
