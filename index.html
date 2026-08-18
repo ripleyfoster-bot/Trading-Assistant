@@ -540,6 +540,33 @@ nav .ico{font-size:17px;line-height:1}
   nav .ico{font-size:15px}
 }
 
+
+/* ---- the 'more' explanation under each edge ---- */
+.why{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.why > summary{
+  list-style:none;cursor:pointer;display:inline-block;
+  font:600 11px/1 var(--f-data);letter-spacing:.9px;color:var(--ink-3);
+  padding:5px 10px;border:1px solid var(--line);border-radius:6px;
+}
+.why > summary::-webkit-details-marker{display:none}
+.why > summary:hover{color:var(--ink);border-color:var(--ink-3)}
+.why[open] > summary{color:var(--acc);border-color:var(--acc)}
+.why[open] > summary::after{content:" ▲";font-size:8px}
+.why:not([open]) > summary::after{content:" ▼";font-size:8px}
+.why-lead{margin:10px 0 4px;font-size:12.5px;line-height:1.45;color:var(--ink-2);font-style:italic}
+.why-row{padding:9px 0;border-top:1px dashed var(--line)}
+.why-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.why-label{font-size:13px;font-weight:600}
+.why-ans{
+  font:700 9px/1 var(--f-data);letter-spacing:.7px;
+  padding:4px 7px;border-radius:5px;white-space:nowrap;
+  background:var(--card-2);color:var(--ink-3);border:1px solid var(--line);
+}
+.why-row.good .why-ans{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-line)}
+.why-row.caution .why-ans{background:var(--caution-bg);color:var(--caution);border-color:var(--caution-line)}
+.why-row.bad .why-ans{background:var(--off-bg);color:var(--off);border-color:var(--off-line)}
+.why-text{margin:5px 0 0;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+
 details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0}
 </style>
 </head>
@@ -806,7 +833,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "3.9";
+var APP_VERSION = "4.0";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1603,6 +1630,8 @@ function renderBoard(){
       card.appendChild(el("div","edge-locked",
         "The setup can't exist today. This one has no door."));
     }
+
+    card.appendChild(whyBox(e.id, r));
 
     if(r.status === "caution"){
       if(ovr){
@@ -4048,6 +4077,152 @@ function acctProposalBox(a, refresh){
 function safely(name, fn){
   try{ fn(); }
   catch(e){ console.error(name + " failed:", e); }
+}
+
+
+/* =====================================================================
+   Why each edge is where it is.
+
+   The board states a verdict; this states the mechanics behind it —
+   every condition the edge depends on, what you answered, and why
+   that condition matters to this particular setup.
+===================================================================== */
+var HTF = "__htf";
+var TIME = "__time";
+
+var EDGE_CHECKS = {
+  flow: [
+    { id:HTF, label:"Higher-timeframe bias",
+      good:["aligned"], caution:["weak"], bad:["conflicted","balanced"],
+      why:"This edge trades from a value-area extreme back through VWAP in the direction the bigger auction is already going. Without weekly or monthly agreement there's no 'flow' to go with — you'd be guessing at a rotation instead of joining a move." },
+    { id:"pullback", label:"Pullback into value available",
+      good:["Yes"], caution:["Early"], bad:["No"],
+      why:"The edge is the pullback, not the move. Entering mid-range gives you no defined risk; waiting for price to come back to the value-area edge is what makes the stop small and the trade worth taking." },
+    { id:"choppyVwap", label:"Chopping around VWAP",
+      good:["No"], bad:["Yes"],
+      why:"VWAP is your first target and your management point. If price is oscillating across it, the target has no meaning and you'll be stopped by noise before the idea resolves." },
+    { id:"edgeFailed", label:"Value-area extreme already failed repeatedly",
+      good:["No"], bad:["Yes"],
+      why:"An edge that has been rejected several times is being accepted through, not defended. The premise of trading from the extreme is that it holds — repeated failure says the auction has moved on." }
+  ],
+  sand: [
+    { id:"lvnClear", label:"Decision LVN clear",
+      good:["Yes"], bad:["No"],
+      why:"The whole setup is a binary line in the sand. If you can't point to a single clean low-volume node, there's no line to be on one side of — and no way to know when you're wrong." },
+    { id:"hvnDefined", label:"Composite HVNs clearly defined",
+      good:["Yes"], caution:["No"],
+      why:"The nearest high-volume node is your target. Poorly defined HVNs mean you're entering with a stop but no honest place to take profit." },
+    { id:"accepting", label:"Price accepting through the decision level",
+      good:["No"], bad:["Yes"],
+      why:"Rejection is the trade; acceptance is the failure. If price is trading comfortably through the LVN, the premise is already broken — this is the universal invalidation rule." }
+  ],
+  ntb: [
+    { id:"nakedPoc", label:"Prior POC still naked",
+      good:["Yes"], bad:["No"],
+      why:"The naked POC is the magnet the entire setup is aimed at. Once it's been tagged the pull is spent — the edge doesn't weaken, it stops existing, which is why this one is a hard off." },
+    { id:"priorBalanced", label:"Prior day balanced",
+      good:["Yes"], caution:["No"],
+      why:"Mean reversion needs a mean. A balanced prior day says the auction agreed on value there and is likely to return; a directional day says it rejected value and moved elsewhere." },
+    { id:"insideValue", label:"Opened inside prior value",
+      good:["Yes"], caution:["No"],
+      why:"An inside-value open is what makes the return to POC a rotation rather than a fight against initiative. Open outside value and you're trading against whoever moved it." }
+  ],
+  dd: [
+    { id:"secondDist", label:"Second distribution formed",
+      good:["Yes"], caution:["Forming"], bad:["No"],
+      why:"You're trading between two accepted areas. Until the second one has actually formed, what looks like a double distribution is just an extended trend leg — and the extreme you'd enter at isn't an extreme yet." },
+    { id:"lvnClear", label:"Separating LVN clear",
+      good:["Yes"], bad:["No"],
+      why:"The low-volume gap between the distributions is the structural boundary and your invalidation. Without a clean separation there aren't two distributions, there's one messy one." },
+    { id:"pocShifting", label:"Developing POC shifting rapidly",
+      good:["No"], bad:["Yes"],
+      why:"The developing POC is the target. A target that moves several points every few minutes can't be traded to — you'd be aiming at something that relocates while you hold." }
+  ],
+  ad: [
+    { id:TIME, label:"Afternoon session",
+      good:["yes"], bad:["no"],
+      why:"The setup is defined by an afternoon pullback after the morning has established direction. In the morning there is no established trend to rejoin, so it's time-gated rather than judged." },
+    { id:"trendDay", label:"Trend day confirmed",
+      good:["Yes"], caution:["Early"], bad:["No"],
+      why:"This edge starts with context, not with the pullback. On a balanced day the midpoint is just the middle of a range and holds no information — rejoining a trend requires a trend." },
+    { id:"deepPullback", label:"Deep pullback into the midpoint holding",
+      good:["Yes"], caution:["No","Early"],
+      why:"A shallow pullback gives you a wide stop for a small remaining move. The depth is what creates the reward-to-risk; the midpoint holding is what says the trend is intact." },
+    { id:"midAccepted", label:"Midpoint being accepted through",
+      good:["No"], bad:["Yes"],
+      why:"If price is trading through the midpoint rather than holding it, the pullback has become a reversal. Acceptance beyond it is the invalidation." },
+    { id:"exhausted", label:"Trend exhausted into major support/resistance",
+      good:["No"], bad:["Yes"],
+      why:"Rejoining a trend that has run into a significant level means buying into where the sellers are waiting. The trade needs somewhere left to go." }
+  ],
+  mcf: [
+    { id:"overlapping", label:"Short-term value areas overlapping",
+      good:["Yes"], bad:["No"],
+      why:"The micro composite is built from overlap. Sessions stacked away from each other don't form a composite — they form a trend, which is a different edge." },
+    { id:"mcBias", label:"Micro composite bias",
+      good:["Clear"], caution:["Tentative"], bad:["None"],
+      why:"The composite exists to give you a side. Without a directional lean you'd be trading developing extremes in both directions, which is a coin flip dressed up as a system." },
+    { id:"compositeWide", label:"Composite too wide to define risk",
+      good:["No"], bad:["Yes"],
+      why:"Risk is defined by the composite edge. If it's so wide that the stop becomes unmanageable, the setup fails on sizing even when the read is right." }
+  ]
+};
+
+function checkStatus(c){
+  var v;
+  if(c.id === HTF)      v = htfBias();
+  else if(c.id === TIME) v = isAfternoon() ? "yes" : "no";
+  else                  v = day().facts[c.id] || "";
+
+  if(!v) return { state:"unknown", answer:"not answered" };
+  if((c.bad || []).indexOf(v) > -1)     return { state:"bad", answer:v };
+  if((c.caution || []).indexOf(v) > -1) return { state:"caution", answer:v };
+  if((c.good || []).indexOf(v) > -1)    return { state:"good", answer:v };
+  return { state:"unknown", answer:v };
+}
+
+function whyBox(edgeId, verdict){
+  var checks = EDGE_CHECKS[edgeId] || [];
+  var det = el("details","why");
+  var sum = el("summary", null, "More");
+  det.appendChild(sum);
+
+  var lead = el("p","why-lead");
+  lead.textContent =
+    verdict.status === "off"
+      ? "This one can't be traded today. A hard off means the setup doesn't physically exist — no reason you type will bring it back."
+      : verdict.status === "caution"
+        ? "The setup exists but the day isn't backing it. Available at minimum size, and only with a typed reason."
+        : "Conditions are met. Full derived size, subject to the risk budget.";
+  det.appendChild(lead);
+
+  checks.forEach(function(c){
+    var st = checkStatus(c);
+    var row = el("div","why-row " + st.state);
+    var head = el("div","why-head");
+    head.appendChild(el("span","why-label", c.label));
+    head.appendChild(el("span","why-ans", st.answer.toUpperCase()));
+    row.appendChild(head);
+    row.appendChild(el("p","why-text", c.why));
+    det.appendChild(row);
+  });
+
+  if(!checks.length){
+    det.appendChild(el("p","why-text","No conditions recorded for this edge."));
+  }
+
+  var say = el("button","speak"); say.type = "button"; say.textContent = "Read aloud";
+  say.style.marginTop = "4px";
+  say.onclick = function(ev){
+    ev.preventDefault(); ev.stopPropagation();
+    var name = (EDGES.filter(function(e){ return e.id === edgeId; })[0] || {}).name || "";
+    speak(name + ". " + lead.textContent + " " +
+      checks.map(function(c){
+        return c.label + ": " + checkStatus(c).answer + ". " + c.why;
+      }).join(" "));
+  };
+  det.appendChild(say);
+  return det;
 }
 
 function renderAll(){
