@@ -567,6 +567,50 @@ nav .ico{font-size:17px;line-height:1}
 .why-row.bad .why-ans{background:var(--off-bg);color:var(--off);border-color:var(--off-line)}
 .why-text{margin:5px 0 0;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
 
+
+.thumbs .drop{position:relative;text-align:center}
+.thumbs img{cursor:pointer}
+.thumb-name{
+  font:600 8px/1.2 var(--f-data);color:var(--ink-3);
+  max-width:64px;margin-top:3px;word-break:break-all;letter-spacing:.2px;
+}
+.thumb-hint{font-size:11.5px;color:var(--ink-3);margin-top:5px}
+.coach-attach{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px;align-items:center}
+.msg .att{
+  display:block;margin-top:7px;font:600 9px/1.3 var(--f-data);
+  letter-spacing:.5px;color:var(--ink-3);
+}
+.msg img.shot{max-width:220px;border-radius:8px;border:1px solid var(--line);margin-top:7px;display:block}
+
+
+.shot-names{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.shot-name{
+  font:600 10px/1 var(--f-data);letter-spacing:.3px;
+  padding:5px 8px;border-radius:6px;cursor:pointer;
+  background:var(--card-2);border:1px solid var(--line);color:var(--ink-3);
+}
+.shot-name:hover{color:var(--acc);border-color:var(--acc)}
+.chat-attach{margin-bottom:8px}
+
+
+.msg-shots{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.msg-shots img{max-width:190px;max-height:140px;border-radius:8px;border:1px solid var(--line);display:block}
+.msg-shots figcaption{font:600 8px/1.3 var(--f-data);color:var(--ink-3);margin-top:3px}
+.coach-cap{margin-bottom:10px}
+
+
+/* ---- crop overlay ---- */
+.crop-ov{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);
+  display:none;flex-direction:column;align-items:center;justify-content:center;padding:14px}
+.crop-ov.on{display:flex}
+.crop-stage{position:relative;max-width:100%;max-height:74vh;line-height:0;touch-action:none}
+.crop-stage img{max-width:100%;max-height:74vh;display:block;user-select:none;-webkit-user-drag:none}
+.crop-sel{position:absolute;border:2px solid #fff;background:rgba(255,255,255,.16);
+  display:none;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.45)}
+.crop-bar{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap;justify-content:center}
+.crop-bar .btn{padding:10px 16px}
+.crop-hint{color:#dfe6ec;font:600 12px/1.4 var(--f-data);margin-top:10px;text-align:center}
+
 details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0}
 </style>
 </head>
@@ -793,12 +837,26 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <h2>Coach</h2>
   <p class="sub">Ask about the method, the board, or today's read. It knows your prep.</p>
   <div class="chat" id="chatOut"></div>
+  <div class="coach-cap" id="coachCap"></div>
   <div class="chat-input">
-    <textarea id="chatIn" placeholder="Ask anything — why is an edge off, what does acceptance mean, is this a Sand day…"></textarea>
+    <textarea id="chatIn" placeholder="Ask anything — or attach a screenshot and ask about what's on it"></textarea>
     <button class="btn" id="chatSend">Send</button>
   </div>
 </section>
 
+
+<div class="crop-ov" id="cropOverlay" role="dialog" aria-modal="true">
+  <div class="crop-stage" id="cropStage">
+    <img id="cropImg" alt="captured image">
+    <div class="crop-sel" id="cropSel"></div>
+  </div>
+  <div class="crop-hint" id="cropHint"></div>
+  <div class="crop-bar">
+    <button class="btn" id="cropUse">Use the box</button>
+    <button class="btn ghost" id="cropWhole">Use the whole thing</button>
+    <button class="btn ghost" id="cropCancel">Cancel</button>
+  </div>
+</div>
 
 <div class="wiz" id="wiz" role="dialog" aria-modal="true">
   <div class="wiz-top">
@@ -833,7 +891,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "4.0";
+var APP_VERSION = "4.2";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1274,43 +1332,17 @@ function renderViews(){
     row.appendChild(ta);
 
     /* ---- capture row: this is now the main way in ---- */
-    var cap = el("div","cap-row");
-
-    var shoot = el("label","cap-btn");
-    shoot.appendChild(document.createTextNode("Shoot the chart"));
-    var file = el("input"); file.type = "file"; file.accept = "image/*";
-    file.multiple = true; file.style.display = "none";
-    file.onchange = function(){ addShots(v.id, file.files); file.value = ""; };
-    shoot.appendChild(file);
-    cap.appendChild(shoot);
-
-    var read = el("button","cap-btn plain");
-    read.type = "button";
-    read.textContent = "Read this view";
-    read.onclick = function(){ analyseView(v.id, read); };
-    cap.appendChild(read);
-
+    var cap = captureRow(v.id, v.name, false, renderViews, "Read this view",
+      function(btn){ analyseView(v.id, btn); });
     var say = el("button","speak");
     say.type = "button"; say.textContent = "Read aloud";
     say.onclick = function(){ speak(v.name + ". " + (d.views[v.id].note || "Nothing noted yet.")); };
-    cap.appendChild(say);
-
+    cap.insertBefore(say, cap.lastChild);
     row.appendChild(cap);
+    row.addEventListener("paste", pasteInto(v.id, v.name, false, renderViews));
 
-    /* thumbnails of anything shot for this view */
-    var shots = SHOTS[v.id] || [];
-    if(shots.length){
-      var th = el("div","thumbs");
-      shots.forEach(function(s, i){
-        var d2 = el("div","drop");
-        var img = el("img"); img.src = s.url; img.alt = "chart";
-        var x = el("button", null, "×");
-        x.onclick = function(){ shots.splice(i,1); renderViews(); };
-        d2.appendChild(img); d2.appendChild(x);
-        th.appendChild(d2);
-      });
-      row.appendChild(th);
-    }
+    var th = thumbRow(v.id, renderViews);
+    if(th) row.appendChild(th);
 
     /* pending proposal from Claude, waiting on your confirmation */
     if(PROPOSALS[v.id]) row.appendChild(proposalBox(v.id));
@@ -1338,18 +1370,45 @@ function renderViews(){
 var SHOTS = {};
 var PROPOSALS = {};
 
-function addShots(viewId, files){
+function addShots(viewId, files, name, refresh){
+  var list0 = Array.prototype.slice.call(files || []);
+  if(!list0.length) return;
+  /* one at a time, so each gets its own crop */
+  var queue = list0.slice();
+  var step = function(){
+    var f = queue.shift();
+    if(!f){ if(refresh) refresh(); return; }
+    var r = new FileReader();
+    r.onload = function(){
+      cropShot(r.result, f.type || "image/jpeg", function(url, type){
+        SHOTS[viewId] = SHOTS[viewId] || [];
+        SHOTS[viewId].push({
+          url:url, b64:url.split(",")[1], type:type,
+          name: shotName(viewId) + (SHOTS[viewId].length ? "_" + (SHOTS[viewId].length + 1) : "")
+        });
+        if(refresh) refresh();
+        step();
+      });
+    };
+    r.onerror = step;
+    r.readAsDataURL(f);
+  };
+  step();
+}
+
+function addShotsRaw(viewId, files, name){
   SHOTS[viewId] = SHOTS[viewId] || [];
   var list = Array.prototype.slice.call(files || []);
   var pending = list.length;
   if(!pending) return;
-  list.forEach(function(f){
+  list.forEach(function(f, ix){
     var r = new FileReader();
     r.onload = function(){
       SHOTS[viewId].push({
         url: r.result,
         b64: String(r.result).split(",")[1],
-        type: f.type || "image/jpeg"
+        type: f.type || "image/jpeg",
+        name: name ? (list.length > 1 ? name + "_" + (ix+1) : name) : (f.name || "image")
       });
       if(--pending === 0){ renderViews(); toast("Shot added — tap Read this view"); }
     };
@@ -2444,7 +2503,16 @@ function dayContext(){
   return out.join("\n");
 }
 
+function renderCoachCap(){
+  var box = $("coachCap"); if(!box) return;
+  box.innerHTML = "";
+  box.appendChild(captureRow("__coach", "__coach", true, renderCoachCap));
+  var th = thumbRow("__coach", renderCoachCap);
+  if(th) box.appendChild(th);
+}
+
 function renderCoach(){
+  renderCoachCap();
   var out = $("chatOut"); out.innerHTML = "";
   var chat = day().coach || [];
   if(!chat.length){
@@ -2456,8 +2524,20 @@ function renderCoach(){
     return;
   }
   chat.forEach(function(m){
-    var b = el("div","msg " + (m.role === "user" ? "me" : "ai"), m.text);
+    var b = el("div","msg " + (m.role === "user" ? "me" : "ai"));
     b.dataset.who = m.role === "user" ? "YOU" : "COACH";
+    if((m.shots || []).length){
+      var sh = el("div","msg-shots");
+      m.shots.forEach(function(s){
+        var fig = el("figure"); fig.style.margin = "0";
+        var im = el("img"); im.src = s.url; im.alt = s.name || "attachment";
+        fig.appendChild(im);
+        fig.appendChild(el("figcaption", null, s.name || ""));
+        sh.appendChild(fig);
+      });
+      b.appendChild(sh);
+    }
+    b.appendChild(document.createTextNode(m.text));
     if(m.role === "assistant"){
       var s = el("button","speak","Read aloud"); s.type = "button";
       s.onclick = function(){ speak(m.text); };
@@ -2471,11 +2551,20 @@ function renderCoach(){
 
 async function sendCoach(){
   var box = $("chatIn"), q = box.value.trim();
-  if(!q) return;
+  var shots = (SHOTS.__coach || []).slice();
+  if(!q && !shots.length) return;
+  if(!q) q = "Have a look at this and tell me what you make of it.";
   var d = day();
   d.coach = d.coach || [];
-  d.coach.push({ role:"user", text:q });
-  save(); box.value = ""; renderCoach();
+  /* thumbnails are kept with the message so the thread still reads back
+     properly; the full images are only sent on this turn */
+  d.coach.push({
+    role:"user", text:q,
+    shots: shots.map(function(s){ return { url:s.url, name:s.name }; })
+  });
+  save(); box.value = "";
+  SHOTS.__coach = [];
+  renderCoach();
 
   var out = $("chatOut");
   var think = el("div","msg think","…thinking");
@@ -2483,12 +2572,29 @@ async function sendCoach(){
 
   /* last 16 turns only — enough memory, small bill */
   var msgs = d.coach.slice(-16).map(function(m){
-    return { role: m.role === "user" ? "user" : "assistant", content: m.text };
+    var t = m.text + ((m.shots || []).length
+      ? " [attached: " + m.shots.map(function(s){ return s.name; }).join(", ") + "]" : "");
+    return { role: m.role === "user" ? "user" : "assistant", content: t };
   });
-  msgs[msgs.length - 1] = {
-    role: "user",
-    content: "Today's prep and board:\n" + dayContext() + "\n\nQuestion: " + q
-  };
+  var where = { prep:"the prep screen", board:"the edge board", plan:"his trade ideas",
+                journal:"the journal", risk:"accounts and risk", coach:"the coach",
+                set:"settings" }[CURRENT] || "the app";
+  var lastContent;
+  if(shots.length){
+    lastContent = shots.map(function(s){
+      return { type:"image", source:{ type:"base64", media_type:s.type, data:s.b64 } };
+    });
+    lastContent.push({ type:"text", text:
+      "Screenshot" + (shots.length > 1 ? "s" : "") + " attached (" +
+      shots.map(function(s){ return s.name; }).join(", ") + "), taken while he was on " +
+      where + ".\n\nRead only what is printed — never infer a price from where something " +
+      "sits on a chart. If a level matters and you can't read it, ask him for the number.\n\n" +
+      "Today's prep and board:\n" + dayContext() + "\n\nQuestion: " + q
+    });
+  } else {
+    lastContent = "Today's prep and board:\n" + dayContext() + "\n\nQuestion: " + q;
+  }
+  msgs[msgs.length - 1] = { role: "user", content: lastContent };
 
   try{
     var text = await callClaudeRaw(msgs, METHOD_BRIEF);
@@ -2503,7 +2609,24 @@ async function sendCoach(){
   }
   renderCoach();
 }
+(function(){
+  var stage = $("cropStage");
+  stage.addEventListener("mousedown", startCropDrag);
+  stage.addEventListener("touchstart", startCropDrag, { passive:false });
+  window.addEventListener("mousemove", moveCropDrag);
+  window.addEventListener("touchmove", moveCropDrag, { passive:false });
+  window.addEventListener("mouseup", endCropDrag);
+  window.addEventListener("touchend", endCropDrag);
+  $("cropUse").onclick = function(){
+    if(!CROP || !CROP.box){ toast("Drag a box first, or use the whole thing"); return; }
+    finishCrop(false);
+  };
+  $("cropWhole").onclick = function(){ finishCrop(true); };
+  $("cropCancel").onclick = function(){ closeCrop(); };
+})();
+
 $("chatSend").onclick = sendCoach;
+$("v-coach").addEventListener("paste", pasteInto("__coach", "__coach", true, renderCoachCap));
 $("chatIn").addEventListener("keydown", function(ev){
   if(ev.key === "Enter" && !ev.shiftKey && window.innerWidth > 700){
     ev.preventDefault(); sendCoach();
@@ -2685,30 +2808,11 @@ function renderJournal(){
   tc.appendChild(el("h3", null, "Log a trade"));
   tc.appendChild(el("p","hint","Shoot your platform's trade log and let Claude read it, or fill it in yourself. Everything stays editable."));
 
-  var cap = el("div","cap-row");
-  var shoot = el("label","cap-btn");
-  shoot.appendChild(document.createTextNode("Shoot the trade log"));
-  var file = el("input"); file.type = "file"; file.accept = "image/*"; file.multiple = true;
-  file.style.display = "none";
-  file.onchange = function(){ addShots("__trade", file.files); file.value = ""; setTimeout(renderJournal, 400); };
-  shoot.appendChild(file); cap.appendChild(shoot);
-  var readBtn = el("button","cap-btn plain"); readBtn.type = "button"; readBtn.textContent = "Read it";
-  readBtn.onclick = function(){ readTradeShot(readBtn); };
-  cap.appendChild(readBtn);
-  tc.appendChild(cap);
-
-  var shots = SHOTS.__trade || [];
-  if(shots.length){
-    var th = el("div","thumbs");
-    shots.forEach(function(s, i){
-      var dd = el("div","drop");
-      var img = el("img"); img.src = s.url;
-      var x = el("button", null, "×");
-      x.onclick = function(){ shots.splice(i,1); renderJournal(); };
-      dd.appendChild(img); dd.appendChild(x); th.appendChild(dd);
-    });
-    tc.appendChild(th);
-  }
+  tc.appendChild(captureRow("__trade", "Trade", true, renderJournal, "Read it",
+    function(btn){ readTradeShot(btn); }));
+  tc.addEventListener("paste", pasteInto("__trade", "Trade", true, renderJournal));
+  var tth = thumbRow("__trade", renderJournal);
+  if(tth) tc.appendChild(tth);
 
   var F = TRADE_FORM;
   var eLab = el("label", null, "Edge"); tc.appendChild(eLab);
@@ -3904,32 +4008,11 @@ function scanBlock(a, refresh){
     "Shoot your account summary and eligibility panel. Whatever it reads lands as tick-boxes — nothing saves until you apply it."));
 
   var key = "__acct" + a.id;
-  var cap = el("div","cap-row");
-
-  var shoot = el("label","cap-btn");
-  shoot.appendChild(document.createTextNode("Shoot the dashboard"));
-  var file = el("input"); file.type = "file"; file.accept = "image/*"; file.multiple = true;
-  file.style.display = "none";
-  file.onchange = function(){ addShots(key, file.files); file.value = ""; setTimeout(refresh, 400); };
-  shoot.appendChild(file); cap.appendChild(shoot);
-
-  var read = el("button","cap-btn plain"); read.type = "button"; read.textContent = "Read it";
-  read.onclick = function(){ scanAccount(a, read, refresh); };
-  cap.appendChild(read);
-  wrap.appendChild(cap);
-
-  var shots = SHOTS[key] || [];
-  if(shots.length){
-    var th = el("div","thumbs");
-    shots.forEach(function(s, i){
-      var d = el("div","drop");
-      var img = el("img"); img.src = s.url;
-      var x = el("button", null, "×");
-      x.onclick = function(){ shots.splice(i,1); refresh(); };
-      d.appendChild(img); d.appendChild(x); th.appendChild(d);
-    });
-    wrap.appendChild(th);
-  }
+  wrap.appendChild(captureRow(key, "Account_" + (a.label || "acct"), false, refresh, "Read it",
+    function(btn){ scanAccount(a, btn, refresh); }));
+  wrap.addEventListener("paste", pasteInto(key, "Account_" + (a.label || "acct"), false, refresh));
+  var ath = thumbRow(key, refresh);
+  if(ath) wrap.appendChild(ath);
 
   if(ACCT_PROPOSALS[a.id]) wrap.appendChild(acctProposalBox(a, refresh));
   return wrap;
@@ -4223,6 +4306,413 @@ function whyBox(edgeId, verdict){
   };
   det.appendChild(say);
   return det;
+}
+
+
+/* =====================================================================
+   Screen capture. The browser can grab a window directly, which saves
+   the Win+Shift+S → save → browse → select dance. Desktop only —
+   iOS Safari has no getDisplayMedia, so there the file picker stands.
+
+   Shots are named by context and time so they're identifiable when you
+   save them out: Overnight_Session_18Aug26, Trade_18Aug26_12-45.
+===================================================================== */
+function canCapture(){
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+}
+
+function stamp(withTime){
+  var d = new Date();
+  var mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+  var s = pad(d.getDate()) + mon + String(d.getFullYear()).slice(2);
+  if(withTime) s += "_" + pad(d.getHours()) + "-" + pad(d.getMinutes());
+  return s;
+}
+
+var SHOT_LABELS = {
+  overnight:"Overnight_Session", rth:"Recent_Cash", micro:"Micro_Composite",
+  composite:"Composite_Profile", monthly:"Monthly", weekly:"Weekly",
+  __trade:"Trade", __coach:"Trade"
+};
+
+function shotName(key){
+  if(key && key.indexOf("__acct") === 0) return "Account_" + stamp(false);
+  var base = SHOT_LABELS[key] || "Chart";
+  var timed = (key === "__trade" || key === "__coach");
+  return base + "_" + stamp(timed);
+}
+
+/* Grab one frame, scale it down, and keep it as a JPEG.
+   Full-resolution screenshots cost a lot of tokens for no extra accuracy. */
+var CAPTURE_PENDING = null;
+async function captureScreen(key){
+  if(!canCapture()){ toast("This device can't capture the screen — use Shoot instead"); return null; }
+  var stream;
+  try{
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 1 }, audio: false
+    });
+  }catch(e){
+    return null;                                  /* cancelled the picker */
+  }
+  try{
+    var track = stream.getVideoTracks()[0];
+    var video = document.createElement("video");
+    video.srcObject = stream; video.muted = true;
+    await video.play();
+    await new Promise(function(r){ setTimeout(r, 220); });   /* let a frame land */
+
+    var w = video.videoWidth || 1280, h = video.videoHeight || 720;
+    var max = 1600, scale = w > max ? max / w : 1;
+    var cv = document.createElement("canvas");
+    cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+    cv.getContext("2d").drawImage(video, 0, 0, cv.width, cv.height);
+    var url = cv.toDataURL("image/jpeg", 0.85);
+
+    stream.getTracks().forEach(function(t){ t.stop(); });
+    video.srcObject = null;
+
+    CAPTURE_PENDING = url;        /* the caller crops it before it lands */
+    return true;
+  }catch(e){
+    try{ stream.getTracks().forEach(function(t){ t.stop(); }); }catch(_){}
+    toast("Capture failed — " + String(e.message || e).slice(0,50));
+    return null;
+  }
+}
+
+/* A capture button, only where the browser can actually do it. */
+function captureBtn(key, refresh){
+  if(!canCapture()) return null;
+  var b = el("button","cap-btn"); b.type = "button";
+  b.textContent = "Capture screen";
+  b.onclick = async function(){
+    b.disabled = true; b.textContent = "Pick a window…";
+    var ok = await captureScreen(key);
+    b.disabled = false; b.textContent = "Capture screen";
+    if(ok){ refresh(); toast("Captured as " + SHOTS[key][SHOTS[key].length-1].name); }
+  };
+  return b;
+}
+
+/* Save a shot out to the device under its generated name. */
+function saveShot(s){
+  var a = document.createElement("a");
+  a.href = s.url; a.download = (s.name || "chart") + ".jpg";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* Thumbnails with their names, a save button, and a delete. */
+function thumbStrip(key, refresh){
+  var shots = SHOTS[key] || [];
+  if(!shots.length) return null;
+  var wrap = el("div","thumbs");
+  shots.forEach(function(s, i){
+    var d = el("div","drop");
+    var img = el("img"); img.src = s.url; img.alt = s.name || "shot";
+    img.title = s.name || "";
+    img.onclick = function(){ saveShot(s); };
+    var x = el("button", null, "×");
+    x.onclick = function(){ shots.splice(i,1); refresh(); };
+    d.appendChild(img); d.appendChild(x);
+    if(s.name) d.appendChild(el("div","thumb-name", s.name));
+    wrap.appendChild(d);
+  });
+  var hint = el("div","thumb-hint","Tap a thumbnail to save it to this device.");
+  var box = el("div");
+  box.appendChild(wrap); box.appendChild(hint);
+  return box;
+}
+
+
+/* =====================================================================
+   Capture. Three ways in, so the Win+Shift+S dance is never required:
+     1. Capture screen  — the browser grabs a frame directly
+     2. Paste           — Win+Shift+S then Ctrl+V, no saving
+     3. Choose image    — the old file picker, and the camera on a phone
+   Everything captured is named on the spot: Overnight_Session_18aug26,
+   Trade_18aug26_12-45, and so on.
+===================================================================== */
+function shotDate(){
+  var d = new Date();
+  var mon = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"][d.getMonth()];
+  return pad(d.getDate()) + mon + String(d.getFullYear()).slice(2);
+}
+function shotTime(){
+  var d = new Date();
+  return pad(d.getHours()) + "-" + pad(d.getMinutes());
+}
+function shotName(kind, withTime){
+  var base = String(kind).replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+  return base + "_" + shotDate() + (withTime ? "_" + shotTime() : "");
+}
+
+function canCapture(){
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+}
+
+async function captureScreen(key, kind, withTime){
+  if(!canCapture()){
+    toast("This device can't capture the screen — use Choose image");
+    return false;
+  }
+  var stream;
+  try{
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video:{ frameRate:1 }, audio:false, preferCurrentTab:false
+    });
+  }catch(e){ return false; }               /* cancelled the picker */
+
+  try{
+    var video = document.createElement("video");
+    video.srcObject = stream;
+    video.muted = true;
+    await video.play();
+    await new Promise(function(r){ setTimeout(r, 300); });   /* let a frame land */
+
+    var c = document.createElement("canvas");
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);
+    var url = c.toDataURL("image/jpeg", 0.85);
+
+    SHOTS[key] = SHOTS[key] || [];
+    SHOTS[key].push({
+      url: url, b64: url.split(",")[1], type: "image/jpeg",
+      name: shotName(kind, withTime)
+    });
+    return true;
+  }catch(e){
+    toast("Capture failed — " + e.message.slice(0,50));
+    return false;
+  }finally{
+    stream.getTracks().forEach(function(t){ t.stop(); });
+  }
+}
+
+/* Win+Shift+S puts the image on the clipboard; this catches the paste. */
+function pasteInto(key, kind, withTime, refresh){
+  return function(ev){
+    var items = (ev.clipboardData || {}).items || [];
+    var got = false;
+    for(var i = 0; i < items.length; i++){
+      if(items[i].type.indexOf("image") !== 0) continue;
+      var f = items[i].getAsFile();
+      if(!f) continue;
+      got = true;
+      var r = new FileReader();
+      r.onload = function(){
+        cropShot(r.result, f.type || "image/png", function(url, type){
+          SHOTS[key] = SHOTS[key] || [];
+          SHOTS[key].push({
+            url:url, b64:url.split(",")[1], type:type,
+            name: shotName(key) + (SHOTS[key].length ? "_" + (SHOTS[key].length + 1) : "")
+          });
+          refresh();
+        });
+      };
+      r.readAsDataURL(f);
+    }
+    if(got) ev.preventDefault();
+  };
+}
+
+/* One row of capture controls, reused everywhere. */
+function captureRow(key, kind, withTime, refresh, readLabel, onRead){
+  var row = el("div","cap-row");
+
+  if(canCapture()){
+    var cap = el("button","cap-btn"); cap.type = "button";
+    cap.textContent = "Capture screen";
+    cap.onclick = async function(){
+      cap.disabled = true; cap.textContent = "Pick a window…";
+      var ok = await captureScreen(key);
+      cap.disabled = false; cap.textContent = "Capture screen";
+      if(ok && CAPTURE_PENDING){
+        var u = CAPTURE_PENDING; CAPTURE_PENDING = null;
+        stageShot(key, u, "image/jpeg", refresh);
+      }
+    };
+    row.appendChild(cap);
+  }
+
+  var pick = el("label","cap-btn plain");
+  pick.appendChild(document.createTextNode(canCapture() ? "Choose image" : "Shoot the chart"));
+  var file = el("input"); file.type = "file"; file.accept = "image/*"; file.multiple = true;
+  file.style.display = "none";
+  file.onchange = function(){
+    addShots(key, file.files, shotName(kind, withTime));
+    file.value = ""; setTimeout(refresh, 400);
+  };
+  pick.appendChild(file);
+  row.appendChild(pick);
+
+  if(onRead){
+    var read = el("button","cap-btn plain"); read.type = "button";
+    read.textContent = readLabel || "Read it";
+    read.onclick = function(){ onRead(read); };
+    row.appendChild(read);
+  }
+
+  var hint = el("span","meta");
+  hint.style.alignSelf = "center";
+  hint.textContent = canCapture() ? "or paste with Ctrl+V" : "";
+  row.appendChild(hint);
+  return row;
+}
+
+/* Thumbnails, with the generated name and a save-to-disk option. */
+function thumbRow(key, refresh){
+  var shots = SHOTS[key] || [];
+  if(!shots.length) return null;
+  var wrap = el("div");
+  var th = el("div","thumbs");
+  shots.forEach(function(s, i){
+    var d = el("div","drop");
+    var img = el("img"); img.src = s.url; img.alt = s.name || "capture";
+    img.title = s.name || "";
+    var x = el("button", null, "×");
+    x.onclick = function(){ shots.splice(i,1); refresh(); };
+    d.appendChild(img); d.appendChild(x);
+    th.appendChild(d);
+  });
+  wrap.appendChild(th);
+
+  var names = el("div","shot-names");
+  shots.forEach(function(s, i){
+    var chip = el("button","shot-name"); chip.type = "button";
+    chip.textContent = (s.name || "capture") + " ⤓";
+    chip.title = "Save this image to your device";
+    chip.onclick = function(){
+      var a = document.createElement("a");
+      a.href = s.url;
+      a.download = (s.name || "capture") + (s.type === "image/png" ? ".png" : ".jpg");
+      document.body.appendChild(a); a.click(); a.remove();
+    };
+    names.appendChild(chip);
+  });
+  wrap.appendChild(names);
+  return wrap;
+}
+
+
+/* =====================================================================
+   Crop before it commits.
+
+   Picking a window in the capture dialogue narrows things to one app,
+   but a platform window still carries a DOM tree, an order ticket and
+   three toolbars around the chart. Dragging a box round the part that
+   matters cuts the tokens and, more importantly, stops the model
+   reading numbers off the wrong panel.
+===================================================================== */
+var CROP = null;
+
+function cropShot(dataUrl, type, cb){
+  var ov = $("cropOverlay");
+  var img = $("cropImg");
+  var sel = $("cropSel");
+  var hint = $("cropHint");
+
+  CROP = { url:dataUrl, type:type || "image/jpeg", cb:cb, box:null, drag:null };
+  img.src = dataUrl;
+  sel.style.display = "none";
+  hint.textContent = "Drag a box round the part that matters, or use the whole thing.";
+  ov.classList.add("on");
+  document.body.style.overflow = "hidden";
+}
+
+function closeCrop(){
+  $("cropOverlay").classList.remove("on");
+  document.body.style.overflow = "";
+  CROP = null;
+}
+
+function cropPoint(ev){
+  var img = $("cropImg");
+  var r = img.getBoundingClientRect();
+  var t = ev.touches ? ev.touches[0] : ev;
+  return {
+    x: Math.max(0, Math.min(r.width,  t.clientX - r.left)),
+    y: Math.max(0, Math.min(r.height, t.clientY - r.top))
+  };
+}
+
+function drawSel(){
+  var sel = $("cropSel"), b = CROP && CROP.box;
+  if(!b){ sel.style.display = "none"; return; }
+  sel.style.display = "block";
+  sel.style.left = Math.min(b.x1, b.x2) + "px";
+  sel.style.top = Math.min(b.y1, b.y2) + "px";
+  sel.style.width = Math.abs(b.x2 - b.x1) + "px";
+  sel.style.height = Math.abs(b.y2 - b.y1) + "px";
+}
+
+function startCropDrag(ev){
+  if(!CROP) return;
+  ev.preventDefault();
+  var p = cropPoint(ev);
+  CROP.box = { x1:p.x, y1:p.y, x2:p.x, y2:p.y };
+  CROP.drag = true;
+  drawSel();
+}
+function moveCropDrag(ev){
+  if(!CROP || !CROP.drag) return;
+  ev.preventDefault();
+  var p = cropPoint(ev);
+  CROP.box.x2 = p.x; CROP.box.y2 = p.y;
+  drawSel();
+  var w = Math.abs(CROP.box.x2 - CROP.box.x1), h = Math.abs(CROP.box.y2 - CROP.box.y1);
+  $("cropHint").textContent = Math.round(w) + " × " + Math.round(h);
+}
+function endCropDrag(){
+  if(!CROP) return;
+  CROP.drag = false;
+  var b = CROP.box;
+  if(b && (Math.abs(b.x2 - b.x1) < 12 || Math.abs(b.y2 - b.y1) < 12)){
+    CROP.box = null; drawSel();
+    $("cropHint").textContent = "Drag a box round the part that matters, or use the whole thing.";
+  }
+}
+
+/* Produce the final image at a sensible size — full resolution costs
+   tokens without making anything more readable. */
+function finishCrop(useWhole){
+  if(!CROP) return;
+  var img = $("cropImg");
+  var natW = img.naturalWidth, natH = img.naturalHeight;
+  var r = img.getBoundingClientRect();
+  var kx = natW / r.width, ky = natH / r.height;
+
+  var sx = 0, sy = 0, sw = natW, sh = natH;
+  if(!useWhole && CROP.box){
+    var b = CROP.box;
+    sx = Math.min(b.x1, b.x2) * kx;
+    sy = Math.min(b.y1, b.y2) * ky;
+    sw = Math.abs(b.x2 - b.x1) * kx;
+    sh = Math.abs(b.y2 - b.y1) * ky;
+  }
+  var max = 1500, scale = sw > max ? max / sw : 1;
+  var cv = document.createElement("canvas");
+  cv.width = Math.max(1, Math.round(sw * scale));
+  cv.height = Math.max(1, Math.round(sh * scale));
+  cv.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+  var url = cv.toDataURL("image/jpeg", 0.85);
+
+  var cb = CROP.cb;
+  closeCrop();
+  if(cb) cb(url, "image/jpeg");
+}
+
+/* Everything that produces an image comes through here. */
+function stageShot(key, dataUrl, type, refresh){
+  cropShot(dataUrl, type, function(finalUrl, finalType){
+    SHOTS[key] = SHOTS[key] || [];
+    SHOTS[key].push({
+      url: finalUrl, b64: finalUrl.split(",")[1], type: finalType,
+      name: shotName(key) + (SHOTS[key].length ? "_" + (SHOTS[key].length + 1) : "")
+    });
+    if(refresh) refresh();
+    toast("Added " + SHOTS[key][SHOTS[key].length - 1].name);
+  });
 }
 
 function renderAll(){
