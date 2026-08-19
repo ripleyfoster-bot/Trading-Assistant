@@ -397,9 +397,10 @@ nav .ico{font-size:17px;line-height:1}
   nav button .dot{display:none}
   nav button[data-go="coach"]{margin-top:auto}
   header{padding-left:166px;z-index:50}
-  main{margin:0 40% 0 150px;max-width:none;padding:16px 24px}
+  main{margin:0 0 0 150px;max-width:none;padding:16px 24px}
+  body.split-on main{margin-right:40%}
   body{padding-bottom:24px}
-  #v-coach{
+  body.split-on #v-coach{
     display:flex !important;flex-direction:column;
     position:fixed;right:0;top:var(--hdr-h,96px);bottom:0;width:40%;
     max-width:none;                      /* the mobile 900px cap must not apply here */
@@ -430,12 +431,12 @@ nav .ico{font-size:17px;line-height:1}
   #v-coach .chat{gap:12px}
 
   /* coach on the left instead — mirror the whole split */
-  body.coach-left main{margin:0 0 0 calc(150px + 40%)}
-  body.coach-left #v-coach{
+  body.split-on.coach-left main{margin:0 0 0 calc(150px + 40%)}
+  body.split-on.coach-left #v-coach{
     right:auto;left:150px;
     border-left:0;border-right:1px solid var(--line);
   }
-  body.coach-left.coach-full #v-coach{left:150px}
+  body.split-on.coach-left.coach-full #v-coach{left:150px}
 
   /* full width, aligned with the header rule above it */
   body.coach-full #v-coach{width:calc(100% - 150px);max-width:none;padding:16px 24px}
@@ -447,6 +448,28 @@ nav .ico{font-size:17px;line-height:1}
   #v-coach h2{margin-top:0}
 }
 
+
+/* ---- coach panel switch, sidebar only ---- */
+.nav-split{display:none}
+@media(min-width:1000px){
+  .nav-split{
+    display:block;margin-top:12px;padding-top:11px;
+    border-top:1px solid var(--line);
+  }
+  .nav-split h4{
+    margin:0 0 7px;font:700 9px/1 var(--f-body);
+    letter-spacing:1.3px;text-transform:uppercase;color:var(--ink-3);padding-left:3px;
+  }
+  .nav-split .seg{display:flex;gap:4px;margin-bottom:5px}
+  .nav-split .seg button{
+    flex:1;padding:6px 4px;border-radius:7px;
+    border:1px solid var(--line);background:transparent;color:var(--ink-2);
+    font:600 11px/1 var(--f-body);cursor:pointer;
+  }
+  .nav-split .seg button[aria-pressed="true"]{
+    background:var(--acc-soft);border-color:var(--acc);color:var(--acc);
+  }
+}
 
 /* ---- journal ---- */
 .lock{
@@ -879,6 +902,11 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <button data-go="journal"><span class="ico">✎</span>Journal<span class="dot"></span></button>
   <button data-go="risk"><span class="ico">◈</span>Risk<span class="dot"></span></button>
   <button data-go="set"><span class="ico">⚙</span>Settings<span class="dot"></span></button>
+  <div class="nav-split" id="navSplit">
+    <h4>Coach panel</h4>
+    <div class="seg" id="splitSeg"></div>
+    <div class="seg" id="sideSeg"></div>
+  </div>
   <button data-go="coach"><span class="ico">✳</span>Coach<span class="dot"></span></button>
 </nav>
 
@@ -891,7 +919,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "4.3";
+var APP_VERSION = "4.4";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -907,6 +935,7 @@ function migrate(s){
   s.accent = s.accent || "graphite";
   s.pmStart = s.pmStart || "17:30";
   s.coachSide = s.coachSide || "right";
+  s.split = s.split || "split";
   s.openTime = s.openTime || "14:30";
   s.apiKey = s.apiKey || "";
   s.days = s.days || {};
@@ -1203,6 +1232,52 @@ var toastT;
 function toast(msg){
   var t = $("toast"); t.textContent = msg; t.classList.add("show");
   clearTimeout(toastT); toastT = setTimeout(function(){ t.classList.remove("show"); }, 2400);
+}
+
+/* The coach either sits beside the work or it doesn't. Width alone used
+   to decide that, which left no way to reclaim the space — now it's a
+   switch, and the panel only lives in the layout when it's on. */
+function splitOn(){ return S.split !== "full"; }
+
+function applySplit(){
+  var on = isDesktop() && splitOn();
+  document.body.classList.toggle("split-on", on);
+  if(!on) document.body.classList.remove("coach-full");
+  if(on){
+    var p = $("v-coach");
+    p.classList.add("on");
+    p.style.display = "";
+    renderCoach();
+  }
+  setTimeout(placeClocks, 30);
+}
+
+function renderNavSplit(){
+  var seg = $("splitSeg"); if(!seg) return;
+  seg.innerHTML = "";
+  [["split","Split"],["full","Full width"]].forEach(function(o){
+    var b = el("button", null, o[1]); b.type = "button";
+    b.setAttribute("aria-pressed", (S.split || "split") === o[0] ? "true" : "false");
+    b.onclick = function(){
+      S.split = o[0]; save();
+      if(o[0] === "full") go(CURRENT === "coach" ? "prep" : CURRENT);
+      applySplit(); renderNavSplit(); renderSettings();
+    };
+    seg.appendChild(b);
+  });
+
+  var side = $("sideSeg");
+  side.innerHTML = "";
+  side.style.display = splitOn() ? "flex" : "none";
+  [["left","Left"],["right","Right"]].forEach(function(o){
+    var b = el("button", null, o[1]); b.type = "button";
+    b.setAttribute("aria-pressed", S.coachSide === o[0] ? "true" : "false");
+    b.onclick = function(){
+      S.coachSide = o[0]; save();
+      applySide(); renderNavSplit(); renderSettings();
+    };
+    side.appendChild(b);
+  });
 }
 
 function applySide(){
@@ -2026,7 +2101,7 @@ function syncNav(name){
   });
 }
 function go(name){
-  if(isDesktop() && name === "coach"){
+  if(isDesktop() && splitOn() && name === "coach"){
     /* coach lives on the right already — the button just expands it */
     var full = document.body.classList.toggle("coach-full");
     var panel = $("v-coach");
@@ -2126,7 +2201,7 @@ function renderSettings(){
   [["left","Left"],["right","Right"]].forEach(function(o){
     var b = el("button","chip", o[1]); b.type = "button";
     b.setAttribute("aria-pressed", S.coachSide === o[0] ? "true" : "false");
-    b.onclick = function(){ S.coachSide = o[0]; save(); applySide(); renderSettings(); };
+    b.onclick = function(){ S.coachSide = o[0]; save(); applySide(); renderNavSplit(); renderSettings(); };
     sc.appendChild(b);
   });
   $("verLine").textContent = "Trading Assistant v" + APP_VERSION +
@@ -2276,6 +2351,7 @@ function wizStepNews(){
 
       box.appendChild(el("p","wiz-sub","Or shoot the feed you actually use — it reads what's on your screen, ratings and all."))
         .style.marginTop = "16px";
+      WIZ.pasteKey = "__cal"; WIZ.pasteKind = "Calendar";
       box.appendChild(captureRow("__cal", "Calendar", false, wizRerender,
         "Read my calendar", function(b){ readCalendarShot(b).then(wizRerender); }));
       var calTh = thumbRow("__cal", wizRerender);
@@ -2322,38 +2398,20 @@ function wizStepView(v){
       v.asks.forEach(function(a){ asks.appendChild(el("li", null, a)); });
       box.appendChild(asks);
 
-      var cap = el("div","cap-row");
-      var shoot = el("label","cap-btn");
-      shoot.appendChild(document.createTextNode("Shoot the chart"));
-      var file = el("input"); file.type = "file"; file.accept = "image/*"; file.multiple = true;
-      file.style.display = "none";
-      /* the crop overlay decides when this is done — a timer here fired
-         mid-crop and the finished shot then had nothing to redraw it */
-      file.onchange = function(){ addShots(v.id, file.files, null, wizRerender); file.value = ""; };
-      shoot.appendChild(file); cap.appendChild(shoot);
-
-      var read = el("button","cap-btn"); read.type = "button"; read.textContent = "Ask Claude to read it";
-      read.onclick = async function(){
-        read.disabled = true; read.textContent = "Reading…";
-        await analyseView(v.id, null);
-        read.disabled = false; read.textContent = "Ask Claude to read it";
-        wizRerender();
-      };
-      cap.appendChild(read);
-      box.appendChild(cap);
-
-      var shots = SHOTS[v.id] || [];
-      if(shots.length){
-        var th = el("div","thumbs");
-        shots.forEach(function(s, i){
-          var d2 = el("div","drop");
-          var img = el("img"); img.src = s.url;
-          var x = el("button", null, "×");
-          x.onclick = function(){ shots.splice(i,1); wizRerender(); };
-          d2.appendChild(img); d2.appendChild(x); th.appendChild(d2);
-        });
-        box.appendChild(th);
-      }
+      /* the same capture engine the rest of the app uses — screen grab,
+         file, or paste, all landing through the crop overlay */
+      WIZ.pasteKey = v.id; WIZ.pasteKind = v.name;
+      box.appendChild(captureRow(v.id, v.name, false, wizRerender,
+        "Ask Claude to read it", function(b){
+          var label = b.textContent;
+          b.disabled = true; b.textContent = "Reading…";
+          analyseView(v.id, null).then(function(){
+            b.disabled = false; b.textContent = label;
+            wizRerender();
+          });
+        }));
+      var th = thumbRow(v.id, wizRerender);
+      if(th) box.appendChild(th);
 
       var ta = el("textarea");
       ta.placeholder = "What you see, in your own words";
@@ -2512,6 +2570,7 @@ function closeWiz(){
 }
 function wizRender(){
   var s = WIZ.steps[WIZ.i];
+  WIZ.pasteKey = null;
   $("wizWhere").textContent = "STEP " + (WIZ.i + 1) + " OF " + WIZ.steps.length;
   $("wizProg").style.width = Math.round((WIZ.i) / (WIZ.steps.length - 1) * 100) + "%";
   var body = $("wizBody"); body.innerHTML = "";
@@ -2523,10 +2582,16 @@ function wizRender(){
 function wizRerender(){
   var keep = $("wizBody").scrollTop;
   var s = WIZ.steps[WIZ.i];
+  WIZ.pasteKey = null;
   var body = $("wizBody"); body.innerHTML = "";
   s.render(body);
   body.scrollTop = keep;
 }
+$("wiz").addEventListener("paste", function(ev){
+  if(!WIZ.pasteKey) return;
+  pasteInto(WIZ.pasteKey, WIZ.pasteKind, false, wizRerender)(ev);
+});
+
 function wizNext(){
   var s = WIZ.steps[WIZ.i];
   if(!s.ready()){ toast(s.need); return; }
@@ -4879,7 +4944,7 @@ function stageShot(key, dataUrl, type, refresh){
 
 function renderAll(){
   day();
-  applyTheme(); applySide(); buildClocks(); dstCheck(); renderHeader();
+  applyTheme(); applySide(); renderNavSplit(); buildClocks(); dstCheck(); renderHeader();
   /* each panel is wrapped so a fault in one can't blank the others */
   safely("focus", renderFocus); safely("news", renderNews);
   safely("views", renderViews); safely("facts", renderFacts);
@@ -4890,8 +4955,12 @@ function renderAll(){
   safely("journal", renderJournal); safely("risk", renderRisk);
   safely("coach", renderCoach); safely("nudge", ruleStaleNudge);
   tickClocks(); measureHeader(); placeClocks();
-  if(isDesktop()) $("v-coach").classList.add("on");
+  applySplit();
 }
+
+window.matchMedia("(min-width:1000px)").addEventListener("change", function(){
+  applySplit(); renderNavSplit();
+});
 setInterval(tickClocks, 1000);
 
 window.matchMedia("(prefers-color-scheme: dark)")
