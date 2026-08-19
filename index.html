@@ -891,7 +891,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "4.2";
+var APP_VERSION = "4.3";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1384,7 +1384,7 @@ function addShots(viewId, files, name, refresh){
         SHOTS[viewId] = SHOTS[viewId] || [];
         SHOTS[viewId].push({
           url:url, b64:url.split(",")[1], type:type,
-          name: shotName(viewId) + (SHOTS[viewId].length ? "_" + (SHOTS[viewId].length + 1) : "")
+          name: (name || shotName(viewId)) + (SHOTS[viewId].length ? "_" + (SHOTS[viewId].length + 1) : "")
         });
         if(refresh) refresh();
         step();
@@ -1461,9 +1461,7 @@ async function analyseView(viewId, btn){
     var text = await callClaudeRaw([{ role:"user", content:content }],
       "You read volume profile charts for a discretionary futures trader. " +
       "You are precise and you never invent a price. You reply with JSON only.");
-    var clean = text.replace(/```json|```/g, "").trim();
-    var p = JSON.parse(clean);
-    PROPOSALS[viewId] = p;
+    PROPOSALS[viewId] = pickJson(text);
     renderViews();
     var vr = $("vr-" + viewId); if(vr) vr.scrollIntoView({block:"center", behavior:"smooth"});
   }catch(e){
@@ -1795,33 +1793,78 @@ async function callClaude(system, user, opts){
 async function callClaudeRaw(messages, system, opts){
   opts = opts || {};
   if(!S.apiKey) throw new Error("no-key");
-  var body = {
-    model: "claude-sonnet-4-6",
-    max_tokens: 1500,
-    system: system,
-    messages: messages
-  };
-  if(opts.search) body.tools = [{ type:"web_search_20250305", name:"web_search" }];
+  var msgs = messages.slice();
+  var text = "";
 
-  var res = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST",
-    headers:{
-      "content-type":"application/json",
-      "x-api-key": S.apiKey,
-      "anthropic-version":"2023-06-01",
-      "anthropic-dangerous-direct-browser-access":"true"
-    },
-    body: JSON.stringify(body)
-  });
-  if(res.status === 401) throw new Error("bad-key");
-  if(!res.ok){
-    var t = await res.text();
-    var err = new Error(t.slice(0,140)); err.status = res.status; throw err;
+  /* A search can run long enough that the turn comes back paused. When it
+     does, the reply so far goes back in and the model carries on — without
+     this the calendar pull returns half an answer and the parse fails. */
+  for(var round = 0; round < 3; round++){
+    var body = {
+      model: "claude-sonnet-4-6",
+      max_tokens: 1500,
+      system: system,
+      messages: msgs
+    };
+    if(opts.search) body.tools = [{ type:"web_search_20250305", name:"web_search" }];
+
+    var res = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST",
+      headers:{
+        "content-type":"application/json",
+        "x-api-key": S.apiKey,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
+      body: JSON.stringify(body)
+    });
+    if(res.status === 401) throw new Error("bad-key");
+    if(!res.ok){
+      var t = await res.text();
+      var msg = t;
+      try{ msg = (JSON.parse(t).error || {}).message || t; }catch(_){}
+      var err = new Error(String(msg).slice(0,160)); err.status = res.status; throw err;
+    }
+    var data = await res.json();
+    var chunk = (data.content || [])
+      .map(function(c){ return c.type === "text" ? c.text : ""; })
+      .filter(Boolean).join("\n");
+    text += (text && chunk ? "\n" : "") + chunk;
+
+    if(data.stop_reason !== "pause_turn") break;
+    msgs = msgs.concat([{ role:"assistant", content:data.content }]);
   }
-  var data = await res.json();
-  return (data.content || [])
-    .map(function(c){ return c.type === "text" ? c.text : ""; })
-    .filter(Boolean).join("\n");
+  return text;
+}
+
+/* With web search on, the model nearly always says something before the
+   JSON — "I'll check the calendar…" — so parsing the whole reply throws.
+   Take the outermost balanced object or array instead. */
+function pickJson(text){
+  var s = String(text || "").replace(/```json|```/g, "").trim();
+  try{ return JSON.parse(s); }catch(_){}
+
+  var opens = { "{":"}", "[":"]" };
+  for(var i = 0; i < s.length; i++){
+    var open = s[i];
+    if(!opens[open]) continue;
+    var close = opens[open], depth = 0, quoted = false, esc = false;
+    for(var j = i; j < s.length; j++){
+      var ch = s[j];
+      if(esc){ esc = false; continue; }
+      if(ch === "\\"){ esc = true; continue; }
+      if(ch === '"'){ quoted = !quoted; continue; }
+      if(quoted) continue;
+      if(ch === open) depth++;
+      else if(ch === close){
+        depth--;
+        if(depth === 0){
+          try{ return JSON.parse(s.slice(i, j+1)); }catch(_){ break; }
+        }
+      }
+    }
+  }
+  throw new Error("nothing readable came back");
 }
 
 async function pullNewsCore(){
@@ -1839,8 +1882,7 @@ async function pullNewsCore(){
       "High impact only, maximum 5. If nothing significant, return an empty array.",
       { search:true }
     );
-    var clean = text.replace(/```json|```/g, "").trim();
-    var parsed = JSON.parse(clean);
+    var parsed = pickJson(text);
     var evs = parsed.events || [];
     if(!evs.length){
       toast("Nothing significant on the calendar today");
@@ -1853,6 +1895,112 @@ async function pullNewsCore(){
     }
 }
 
+/* Shooting the feed is the honest version of the pull — it reads what is
+   actually on your screen rather than what a search engine thinks today
+   holds. Times are the trap: a feed set to London must never be re-read
+   as New York, so the model reports what was printed and says plainly
+   when it cannot tell which zone it was looking at. */
+var NEWS_PROPOSAL = null;
+
+async function readCalendarShot(btn){
+  var shots = SHOTS.__cal || [];
+  if(!shots.length){ toast("Shoot your calendar first"); return; }
+  if(btn){ btn.disabled = true; btn.textContent = "Reading…"; }
+
+  var content = [];
+  shots.forEach(function(s){
+    content.push({ type:"image", source:{ type:"base64", media_type:s.type, data:s.b64 } });
+  });
+  content.push({ type:"text", text:
+    "This is a screenshot of my economic calendar / news feed. I trade micro E-mini S&P " +
+    "futures (mES) from the UK.\n\n" +
+    "Return ONLY this JSON, no prose and no code fences:\n" +
+    '{"events":[{"uk":"HH:MM","printed":"the time exactly as it appears","tz":"UK|ET|unknown",' +
+    '"what":"event name","impact":"high|medium|low"}],"unsure":["anything you could not read"]}\n\n' +
+    "Rules on time, and these matter more than anything else:\n" +
+    "- If the feed states its times are UK / London / GMT / BST, then uk is the printed time unchanged.\n" +
+    "- If the feed states US Eastern / ET / New York, convert to UK and put the original in printed.\n" +
+    "- If you cannot tell which zone the feed is in, set tz to unknown, leave uk as printed, " +
+    "and say so in unsure. Never assume a zone from the event names.\n\n" +
+    "Rules on impact: use the feed's own rating — a colour, a dot, a bull count — and map it to " +
+    "high, medium or low. If the feed shows no rating, leave impact empty rather than judging it " +
+    "yourself. Include every event you can read, not only the big ones. " +
+    "Read only what is printed; anything blurred goes in unsure."
+  });
+
+  try{
+    var text = await callClaudeRaw([{ role:"user", content:content }],
+      "You read economic calendar screenshots for a UK futures trader. You are precise about " +
+      "times and time zones, you never invent an event, and you reply with JSON only.");
+    NEWS_PROPOSAL = pickJson(text);
+  }catch(e){
+    toast(e.message === "no-key" ? "Add your API key in Settings"
+        : e.message === "bad-key" ? "That key was rejected — check Settings"
+        : "Couldn't read the calendar — " + String(e.message || e).slice(0,60));
+  }
+  if(btn){ btn.disabled = false; btn.textContent = "Read my calendar"; }
+}
+
+function newsProposalBox(refresh){
+  var p = NEWS_PROPOSAL || {};
+  var evs = (p.events || []).filter(function(e){ return e && (e.what || "").trim(); });
+  var box = el("div","proposal");
+  box.appendChild(el("h4", null, "What Claude read"));
+  box.appendChild(el("p","lead","Untick anything wrong. Nothing is saved until you apply it."));
+
+  if(!evs.length) box.appendChild(el("p","lead","No events came off that shot. Add them by hand."));
+
+  var items = [];
+  evs.forEach(function(e, i){
+    var t = (e.uk || e.printed || "—").trim();
+    var line = t + "  " + e.what + (e.impact ? "  · " + String(e.impact).toUpperCase() : "");
+    if(e.tz === "ET") line += "  (was " + e.printed + " ET)";
+    var row = el("div","prop-item");
+    var cb = el("input"); cb.type = "checkbox"; cb.checked = true;
+    cb.id = "prop-cal-" + i;
+    var lab = el("label", null, line); lab.setAttribute("for", cb.id);
+    row.appendChild(cb); row.appendChild(lab);
+    box.appendChild(row);
+    items.push({ box:cb, time:t, what:e.what.trim(), impact:(e.impact || "").toLowerCase() });
+  });
+
+  var unknown = evs.filter(function(e){ return e.tz === "unknown"; }).length;
+  if(unknown){
+    box.appendChild(el("div","prop-unsure",
+      "Couldn't tell what time zone that feed is set to, so " + unknown +
+      (unknown === 1 ? " time is" : " times are") + " exactly as printed. " +
+      "If your feed runs on New York, these need five hours adding before you trust them."));
+  }
+  if((p.unsure || []).length){
+    box.appendChild(el("div","prop-unsure","Couldn't read confidently: " + p.unsure.join("; ") + "."));
+  }
+
+  var row = el("div","cap-row");
+  var apply = el("button","cap-btn"); apply.type = "button"; apply.textContent = "Add these";
+  apply.onclick = function(){
+    var d = day(); d.news = d.news || [];
+    var n = 0;
+    items.forEach(function(it){
+      if(!it.box.checked) return;
+      var dupe = d.news.some(function(x){
+        return x.what.toLowerCase() === it.what.toLowerCase() && x.time === it.time;
+      });
+      if(dupe) return;
+      d.news.push({ time:it.time || "—", what:it.what, impact:it.impact });
+      n++;
+    });
+    NEWS_PROPOSAL = null; SHOTS.__cal = [];
+    save(); renderNews(); renderSteps();
+    if(refresh) refresh();
+    toast(n ? n + (n === 1 ? " event added" : " events added") : "Nothing new — already on the list");
+  };
+  var drop = el("button","cap-btn plain"); drop.type = "button"; drop.textContent = "Discard";
+  drop.onclick = function(){ NEWS_PROPOSAL = null; if(refresh) refresh(); };
+  row.appendChild(apply); row.appendChild(drop);
+  box.appendChild(row);
+  return box;
+}
+
 async function pullNews(){
   var btn = $("pullNews");
   btn.disabled = true; btn.textContent = "Looking…";
@@ -1861,7 +2009,7 @@ async function pullNews(){
   }catch(e){
     toast(e.message === "no-key" ? "Add your API key in Settings"
         : e.message === "bad-key" ? "That key was rejected — check Settings"
-        : "Couldn't pull the calendar — add events by hand");
+        : "Couldn't pull the calendar — " + String(e.message || e).slice(0,70));
   }
   btn.disabled = false; btn.textContent = "Pull today's events";
 }
@@ -2125,6 +2273,15 @@ function wizStepNews(){
         wizRerender();
       };
       box.appendChild(pull);
+
+      box.appendChild(el("p","wiz-sub","Or shoot the feed you actually use — it reads what's on your screen, ratings and all."))
+        .style.marginTop = "16px";
+      box.appendChild(captureRow("__cal", "Calendar", false, wizRerender,
+        "Read my calendar", function(b){ readCalendarShot(b).then(wizRerender); }));
+      var calTh = thumbRow("__cal", wizRerender);
+      if(calTh) box.appendChild(calTh);
+      if(NEWS_PROPOSAL) box.appendChild(newsProposalBox(wizRerender));
+
       var list = day().news || [];
       list.forEach(function(n, idx){
         var row = el("div","idea");
@@ -2133,6 +2290,7 @@ function wizStepNews(){
         var x = el("button","x","×");
         x.onclick = function(){ list.splice(idx,1); save(); wizRerender(); };
         h.appendChild(x); row.appendChild(h);
+        if(n.impact) row.appendChild(el("div","meta", n.impact.toUpperCase()));
         box.appendChild(row);
       });
       var r2 = el("div","row-2"); r2.style.marginTop = "12px";
@@ -2169,7 +2327,9 @@ function wizStepView(v){
       shoot.appendChild(document.createTextNode("Shoot the chart"));
       var file = el("input"); file.type = "file"; file.accept = "image/*"; file.multiple = true;
       file.style.display = "none";
-      file.onchange = function(){ addShots(v.id, file.files); file.value = ""; setTimeout(wizRerender, 400); };
+      /* the crop overlay decides when this is done — a timer here fired
+         mid-crop and the finished shot then had nothing to redraw it */
+      file.onchange = function(){ addShots(v.id, file.files, null, wizRerender); file.value = ""; };
       shoot.appendChild(file); cap.appendChild(shoot);
 
       var read = el("button","cap-btn"); read.type = "button"; read.textContent = "Ask Claude to read it";
@@ -2475,7 +2635,9 @@ function dayContext(){
     out.push("Prep is not complete yet, so the board is locked.");
   }
   if((d.news || []).length){
-    out.push("News: " + d.news.map(function(n){ return n.time + " " + n.what; }).join("; "));
+    out.push("News: " + d.news.map(function(n){
+      return n.time + " " + n.what + (n.impact ? " (" + n.impact + " impact)" : " (unrated)");
+    }).join("; "));
   }
   var bud = dailyBudget();
   if(bud){
@@ -2891,7 +3053,7 @@ async function readTradeShot(btn){
   try{
     var text = await callClaudeRaw([{ role:"user", content:content }],
       "You read trading platform screenshots precisely and never invent a number. JSON only.");
-    var p = JSON.parse(text.replace(/```json|```/g, "").trim());
+    var p = pickJson(text);
     ["dir","size","entry","exit","stop","result"].forEach(function(k){
       if(p[k]) TRADE_FORM[k] = String(p[k]);
     });
@@ -4049,7 +4211,7 @@ async function scanAccount(a, btn, refresh){
   try{
     var text = await callClaudeRaw([{ role:"user", content:content }],
       "You read trading account dashboards precisely and never invent a figure. JSON only.");
-    ACCT_PROPOSALS[a.id] = JSON.parse(text.replace(/```json|```/g, "").trim());
+    ACCT_PROPOSALS[a.id] = pickJson(text);
     refresh();
   }catch(e){
     toast(e.message === "no-key" ? "Add your API key in Settings"
@@ -4540,8 +4702,8 @@ function captureRow(key, kind, withTime, refresh, readLabel, onRead){
   var file = el("input"); file.type = "file"; file.accept = "image/*"; file.multiple = true;
   file.style.display = "none";
   file.onchange = function(){
-    addShots(key, file.files, shotName(kind, withTime));
-    file.value = ""; setTimeout(refresh, 400);
+    addShots(key, file.files, shotName(kind, withTime), refresh);
+    file.value = "";
   };
   pick.appendChild(file);
   row.appendChild(pick);
