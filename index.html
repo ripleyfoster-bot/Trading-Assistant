@@ -522,6 +522,40 @@ nav .ico{font-size:17px;line-height:1}
   border-radius:var(--radius-sm);padding:10px 12px;font-size:13.5px;margin-bottom:var(--gap);
 }
 
+/* ---- live trade ----
+   The bar lives in the header, so a position you're actually in follows
+   you onto every screen rather than hiding on the journal. */
+.live-bar{
+  margin-top:8px;padding:7px 10px;border-radius:var(--radius-sm);
+  background:var(--card-2);border:1px solid var(--line);
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+}
+.live-bar.due{background:var(--caution-bg);border-color:var(--caution-line)}
+.lb-dot{flex:0 0 8px;height:8px;border-radius:50%;background:var(--ok);animation:lbp 2.4s ease-in-out infinite}
+.live-bar.due .lb-dot{background:var(--caution)}
+@keyframes lbp{0%,100%{opacity:1}50%{opacity:.2}}
+@media(prefers-reduced-motion:reduce){ .lb-dot{animation:none} }
+.lb-what{font:600 11px/1.35 var(--f-data);letter-spacing:.5px;color:var(--ink-2);flex:1 1 120px;min-width:0}
+.live-bar.due .lb-what{color:var(--caution)}
+.lb-btn{
+  font:600 12px/1 var(--f-body);padding:7px 11px;border-radius:8px;cursor:pointer;
+  background:var(--acc);color:var(--acc-ink);border:1px solid var(--acc);white-space:nowrap;
+}
+.lb-btn.plain{background:transparent;border-color:var(--line);color:var(--ink-2)}
+.live-card{border-color:var(--acc)}
+.trade.live::before{background:var(--acc)}
+.live-tag{
+  font:700 10px/1 var(--f-data);letter-spacing:.9px;color:var(--acc);
+  border:1px solid var(--acc);border-radius:6px;padding:4px 7px;white-space:nowrap;
+}
+.ci-row{
+  display:flex;gap:10px;padding:8px 0;font-size:13px;line-height:1.4;
+  border-bottom:1px dashed var(--line);align-items:baseline;
+}
+.ci-row .t{font:600 11px/1.5 var(--f-data);color:var(--ink-3);flex:0 0 42px}
+.ci-row .bad{color:var(--off);font-weight:600}
+.ci-row .warn{color:var(--caution);font-weight:600}
+
 
 #v-coach{padding:16px;max-width:900px;margin:0 auto}
 
@@ -662,6 +696,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   </div>
   <div class="prog"><i id="hdrProg"></i></div>
   <div id="dstBanner"></div>
+  <div id="liveBar"></div>
 </header>
 
 <main>
@@ -835,6 +870,16 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   </div>
 
   <div class="card">
+    <h3>In-trade check-ins</h3>
+    <p class="hint">How often the app asks you to look up while a position is open. It only nudges while the app is on screen — the bar in the header turns amber, nothing buzzes. Set these to whatever actually suits your holding times; 10 and 15 are only a starting point.</p>
+    <label for="ciFirst">Minutes after entry before the first check-in is due</label>
+    <input type="text" id="ciFirst" class="price" placeholder="10" inputmode="numeric">
+    <label for="ciEvery">Minutes between check-ins after that</label>
+    <input type="text" id="ciEvery" class="price" placeholder="15" inputmode="numeric">
+    <p class="hint" style="margin:8px 0 0">Put 0 in either box to turn that nudge off. The Check in button stays available whenever you want it.</p>
+  </div>
+
+  <div class="card">
     <h3>Claude API key</h3>
     <p class="hint">Kept on this device only. Used to pull the calendar and, later, to coach.</p>
     <input type="text" id="apiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
@@ -934,7 +979,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "4.5";
+var APP_VERSION = "4.6";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -952,6 +997,10 @@ function migrate(s){
   s.coachSide = s.coachSide || "right";
   s.split = s.split || "split";
   s.openTime = s.openTime || "14:30";
+  /* check-in rhythm. Starting points only — the numbers are his to set
+     in Settings, and 0 in either turns that nudge off. */
+  if(s.ciFirst === undefined) s.ciFirst = 10;
+  if(s.ciEvery === undefined) s.ciEvery = 15;
   s.apiKey = s.apiKey || "";
   s.days = s.days || {};
   return s;
@@ -2230,10 +2279,22 @@ function renderSettings(){
     ". If this doesn't match the newest version, the old files are still cached — force an update, or close and reopen the app.";
   $("pmStart").value = S.pmStart;
   $("openTime").value = S.openTime;
+  $("ciFirst").value = S.ciFirst;
+  $("ciEvery").value = S.ciEvery;
   $("apiKey").value = S.apiKey ? "sk-ant-…" + S.apiKey.slice(-6) : "";
 }
 $("pmStart").onchange = function(){ S.pmStart = this.value.trim() || "17:30"; save(); renderBoard(); };
 $("openTime").onchange = function(){ S.openTime = this.value.trim() || "14:30"; save(); };
+$("ciFirst").onchange = function(){
+  var v = parseInt(this.value, 10);
+  S.ciFirst = isNaN(v) || v < 0 ? 0 : v;
+  this.value = S.ciFirst; save(); renderLiveBar();
+};
+$("ciEvery").onchange = function(){
+  var v = parseInt(this.value, 10);
+  S.ciEvery = isNaN(v) || v < 0 ? 0 : v;
+  this.value = S.ciEvery; save(); renderLiveBar();
+};
 
 $("forceUpdate").onclick = async function(){
   try{
@@ -2732,6 +2793,27 @@ function dayContext(){
       ", daily budget " + money(bud.budget) + ", " + money(bud.left) + " left, " +
       bud.taken + " of " + bud.attempts + " attempts used.");
   }
+  var L = liveTrade();
+  if(L){
+    var lt = L.t;
+    out.push("HE IS IN A TRADE RIGHT NOW: T" + lt.n + ", " + edgeName(lt.edge) + " " + lt.dir +
+      ", " + (lt.size || "?") + " contracts, entry " + lt.entry + ", stop " + lt.stop +
+      (lt.target ? ", target " + lt.target : "") +
+      ", opened " + lt.time + " UK (" + minsSince(lt.openedAt) + " minutes ago)" +
+      (lt.status === "caution" ? ", taken on caution because: " + lt.cautionWhy : "") + ".");
+    out.push("What he said has to stay true for it to work: \"" + lt.mustHold + "\"");
+    if((lt.checkins || []).length){
+      out.push("Check-ins so far: " + lt.checkins.map(function(c){
+        return c.t + " — premise " + (c.holds === "yes" ? "holds" : c.holds === "no" ? "GONE" : "unsure") +
+          ", stop " + (STOP_WORDS[c.stop] || "?") + (c.stopWhy ? " (" + c.stopWhy + ")" : "") +
+          ", feeling " + (c.feel || []).join("/") + (c.note ? ", note: " + c.note : "");
+      }).join(" | "));
+    } else {
+      out.push("No check-ins logged on it yet.");
+    }
+    out.push("If he asks about this position, work from that line about what has to stay true. " +
+      "Do not guess where price is now — ask him.");
+  }
   if((d.trades || []).length){
     out.push("Trades today: " + d.trades.map(function(t){
       return "T" + t.n + " " + t.edge + " " + t.dir + " entry " + t.entry +
@@ -3036,6 +3118,9 @@ function renderJournal(){
     out.appendChild(lk);
   }
 
+  /* ---- the position you're actually in, first ---- */
+  out.appendChild(liveCard());
+
   /* ---- observations ---- */
   var oc = el("div","card");
   oc.appendChild(el("h3", null, "Observations"));
@@ -3117,11 +3202,13 @@ function renderJournal(){
   out.appendChild(tc);
 
   /* ---- today's trades ---- */
-  if(d.trades.length){
+  var closed = d.trades.filter(function(t){ return !t.live; });
+  if(closed.length){
     var h = el("div"); h.style.margin = "18px 0 10px";
     h.appendChild(el("h3", null, "Today's trades"));
     out.appendChild(h);
-    d.trades.forEach(function(t, i){ out.appendChild(tradeCard(t, i)); });
+    /* index against the real array — the live one is shown above, not here */
+    d.trades.forEach(function(t, i){ if(!t.live) out.appendChild(tradeCard(t, i)); });
     out.appendChild(dayTotals());
   }
 
@@ -3186,6 +3273,10 @@ function addTrade(){
     result: F.result || "",
     tags: tagSnapshot(),
     status: v && v[F.edge] ? v[F.edge].status : "n/a",
+    /* logged after the fact, so it was never live in the app and has
+       no check-ins — the field exists so nothing downstream has to
+       test for its absence */
+    live: false, checkins: [],
     review: null
   });
   TRADE_FORM = {};
@@ -3193,6 +3284,813 @@ function addTrade(){
   save(); renderJournal();
   toast("Logged. The four-minute review is where the value is.");
 }
+
+/* =====================================================================
+   In-trade check-ins.
+
+   The journal knows about finished trades. A position you are sitting in
+   is a different animal: the decision that matters is whether to still be
+   in it, and that decision gets made worst when nobody asks the question.
+   So a trade can be opened live, it carries the one line you wrote about
+   what has to stay true, and the app comes back and reads that line to
+   you at an interval you set.
+
+   Nothing here blocks anything. The one exception is the daily loss
+   limit, which was already decided as a hard wall — it refuses to open a
+   new position, and no typed reason gets round it.
+===================================================================== */
+
+function edgeName(id){
+  var e = EDGES.filter(function(x){ return x.id === id; })[0];
+  return e ? e.name : (id === "none" ? "Off-plan" : id);
+}
+function edgeShort(id){
+  var e = EDGES.filter(function(x){ return x.id === id; })[0];
+  return e ? e.short : "OFF-PLAN";
+}
+
+function liveTrade(){
+  var d = day();
+  for(var i = 0; i < d.trades.length; i++){
+    if(d.trades[i].live) return { t: d.trades[i], i: i };
+  }
+  return null;
+}
+function minsSince(iso){
+  if(!iso) return 0;
+  var ms = Date.now() - new Date(iso).getTime();
+  return ms < 0 ? 0 : Math.floor(ms / 60000);
+}
+function lastCheckin(t){
+  var c = t.checkins || [];
+  return c.length ? c[c.length - 1] : null;
+}
+/* Due on the first interval after entry, then on the repeat interval
+   from the last check-in. A 0 in Settings switches that leg off. */
+function checkinDue(t){
+  var last = lastCheckin(t);
+  if(!last) return +S.ciFirst > 0 && minsSince(t.openedAt) >= +S.ciFirst;
+  return +S.ciEvery > 0 && minsSince(last.at) >= +S.ciEvery;
+}
+
+function renderLiveBar(){
+  var box = $("liveBar"); if(!box) return;
+  box.innerHTML = "";
+  var L = liveTrade(); if(!L) return;
+  var t = L.t, due = checkinDue(t);
+
+  var bar = el("div", "live-bar" + (due ? " due" : ""));
+  bar.appendChild(el("i","lb-dot"));
+
+  var mins = minsSince(t.openedAt);
+  var last = lastCheckin(t);
+  var line = "T" + t.n + " " + edgeShort(t.edge) + " " + t.dir.toUpperCase() +
+             " · " + mins + " MIN IN";
+  if(due) line += " · CHECK IN";
+  else if(last) line += " · CHECKED " + minsSince(last.at) + " MIN AGO";
+  bar.appendChild(el("span","lb-what", line));
+
+  var ci = el("button","lb-btn"); ci.type = "button"; ci.textContent = "Check in";
+  ci.onclick = function(){ openCheckin(); };
+  bar.appendChild(ci);
+
+  var out = el("button","lb-btn plain"); out.type = "button"; out.textContent = "I'm out";
+  out.onclick = function(){ openCloseOut(); };
+  bar.appendChild(out);
+
+  box.appendChild(bar);
+  measureHeader();
+}
+
+/* ---------------------------------------------------------------------
+   The card on the journal
+--------------------------------------------------------------------- */
+function liveCard(){
+  var L = liveTrade();
+  var c = el("div","card live-card");
+
+  if(!L){
+    c.appendChild(el("h3", null, "In a trade"));
+    c.appendChild(el("p","hint",
+      "Open it here when you get filled and the app will keep asking whether it still holds. You can still log a finished trade below if you'd rather do it after."));
+    var b = el("button","btn wide"); b.type = "button"; b.textContent = "I'm in a trade";
+    b.onclick = startInTrade;
+    c.appendChild(b);
+    return c;
+  }
+
+  var t = L.t;
+  var top = el("div","trade-top");
+  var left = el("div");
+  left.appendChild(el("div","trade-n","T" + t.n + " · IN SINCE " + t.time));
+  left.appendChild(el("div", null, edgeName(t.edge) + " · " + t.dir +
+    (t.size ? " · " + t.size + (t.size === "1" ? " contract" : " contracts") : "") +
+    (t.status === "caution" ? " · caution" : "")));
+  top.appendChild(left);
+  top.appendChild(el("div","live-tag", minsSince(t.openedAt) + " MIN"));
+  c.appendChild(top);
+
+  var legs = el("div","trade-legs");
+  [["ENTRY", t.entry],["STOP", t.stop],["TARGET", t.target],["RISK", riskPoints(t)]]
+    .forEach(function(p){
+      var dd = el("div");
+      dd.appendChild(el("span", null, p[0]));
+      dd.appendChild(document.createTextNode(p[1] || "—"));
+      legs.appendChild(dd);
+    });
+  c.appendChild(legs);
+
+  if(t.mustHold){
+    var mh = el("p","hint"); mh.style.marginTop = "10px";
+    mh.appendChild(el("b", null, "Still true? "));
+    mh.appendChild(document.createTextNode(t.mustHold));
+    c.appendChild(mh);
+  }
+  if(t.cautionWhy){
+    var cw = el("p","hint"); cw.style.margin = "4px 0 0";
+    cw.appendChild(el("b", null, "On caution because: "));
+    cw.appendChild(document.createTextNode(t.cautionWhy));
+    c.appendChild(cw);
+  }
+
+  c.appendChild(checkinList(t));
+
+  var row = el("div","cap-row");
+  var b1 = el("button","cap-btn"); b1.type = "button";
+  b1.textContent = checkinDue(t) ? "Check in — it's due" : "Check in";
+  b1.onclick = function(){ openCheckin(); };
+  row.appendChild(b1);
+  var b2 = el("button","cap-btn plain"); b2.type = "button"; b2.textContent = "I'm out";
+  b2.onclick = function(){ openCloseOut(); };
+  row.appendChild(b2);
+  var b3 = el("button","cap-btn plain"); b3.type = "button"; b3.textContent = "Never happened";
+  b3.onclick = function(){
+    if(!confirm("Delete T" + t.n + " entirely? Use this only if the fill wasn't real.")) return;
+    day().trades.splice(L.i, 1);
+    day().trades.forEach(function(tt, n){ tt.n = n + 1; });
+    save(); renderJournal(); renderLiveBar();
+  };
+  row.appendChild(b3);
+  c.appendChild(row);
+  return c;
+}
+
+function riskPoints(t){
+  var e = parseFloat(String(t.entry).replace(/[^0-9.\-]/g,""));
+  var s = parseFloat(String(t.stop).replace(/[^0-9.\-]/g,""));
+  if(isNaN(e) || isNaN(s)) return "";
+  return Math.abs(e - s).toFixed(2).replace(/\.00$/,"") + " pts";
+}
+
+function checkinList(t){
+  var wrap = el("div"); wrap.style.marginTop = "10px";
+  var c = t.checkins || [];
+  if(!c.length){
+    wrap.appendChild(el("p","hint","No check-ins yet."));
+    return wrap;
+  }
+  c.forEach(function(ci, n){
+    var r = el("div","ci-row");
+    r.appendChild(el("span","t", ci.t));
+    var body = el("span");
+    var holds = ci.holds === "yes" ? "still holds"
+              : ci.holds === "no" ? "no longer holds"
+              : "not sure it holds";
+    var hs = el("b", ci.holds === "no" ? "bad" : ci.holds === "unsure" ? "warn" : null, holds);
+    body.appendChild(hs);
+    var bits = [];
+    if(ci.stop && ci.stop !== "same") bits.push("stop " + STOP_WORDS[ci.stop]);
+    if((ci.feel || []).length) bits.push((ci.feel || []).join(", ").toLowerCase());
+    if(bits.length) body.appendChild(document.createTextNode(" · " + bits.join(" · ")));
+    if(ci.note) body.appendChild(document.createTextNode(" · " + ci.note));
+    if(ci.stopWhy) body.appendChild(document.createTextNode(" — " + ci.stopWhy));
+    r.appendChild(body);
+    wrap.appendChild(r);
+  });
+  return wrap;
+}
+
+var STOP_WORDS = {
+  same:"unchanged", be:"moved to break-even",
+  tighter:"tightened", wider:"widened"
+};
+
+/* ---------------------------------------------------------------------
+   Opening a position
+--------------------------------------------------------------------- */
+var IT = null;   /* the trade being opened */
+
+function startInTrade(){
+  if(liveTrade()){ toast("You're already in one — close it first"); return; }
+
+  /* the one wall with no door */
+  var b = dailyBudget();
+  if(b && b.blown){
+    alert("Daily loss limit reached — " + money(b.used) + " of a " + money(b.budget) +
+      " budget on " + b.account.label + ".\n\nThat's the hard wall. No new position today, and no reason gets round it. " +
+      "If you're already filled at your broker, close it there and log it below as a finished trade.");
+    return;
+  }
+
+  IT = { edge:"", dir:"Long", entry:"", stop:"", target:"", size:"",
+         mustHold:"", cautionWhy:"", fromIdea:null };
+
+  var ideas = day().ideas || [];
+  var steps = [];
+  if(ideas.length) steps.push(itStepIdea(ideas));
+  steps.push(itStepEdge(), itStepDir(),
+             itStepPrice("entry","Where did you get filled?","The price you actually got, not the one you wanted.","Entry price"),
+             itStepPrice("stop","Where's the stop?","Structure sets this, not a round number of points. Size comes off it, never the other way round.","Stop price"),
+             itStepSize(), itStepMustHold(), itStepConfirm());
+
+  WIZ.steps = steps;
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+  WIZ.onClose = function(){ IT = null; renderJournal(); renderLiveBar(); };
+}
+
+function itStepIdea(ideas){
+  return {
+    say: "Is this one of the ideas you already wrote?",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Is this one of your ideas?"));
+      box.appendChild(el("p","wiz-sub",
+        "Picking one fills in the numbers you already decided on. You can still change any of them on the way through."));
+      var chips = el("div","chips");
+      ideas.forEach(function(it, n){
+        var label = edgeName(it.edge) + " · " + it.dir + " · " + it.entry;
+        var b = el("button","chip", label); b.type = "button";
+        b.setAttribute("aria-pressed", IT.fromIdea === n ? "true" : "false");
+        b.onclick = function(){
+          IT.fromIdea = n;
+          IT.edge = it.edge; IT.dir = it.dir;
+          IT.entry = it.entry; IT.stop = it.stop; IT.target = it.target || "";
+          IT.mustHold = IT.mustHold || it.note || "";
+          wizRerender();
+        };
+        chips.appendChild(b);
+      });
+      var no = el("button","chip","No — something else"); no.type = "button";
+      no.setAttribute("aria-pressed", IT.fromIdea === -1 ? "true" : "false");
+      no.onclick = function(){ IT.fromIdea = -1; wizRerender(); };
+      chips.appendChild(no);
+      box.appendChild(chips);
+      if(IT.fromIdea === -1){
+        box.appendChild(el("p","hint",
+          "Fair enough — but it's worth noticing later whether the unplanned ones pay."));
+      }
+    },
+    ready: function(){ return IT.fromIdea !== null; },
+    need: "Pick one, or say it's something else"
+  };
+}
+
+function itStepEdge(){
+  return {
+    say: "Which edge is this?",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Which edge is this?"));
+      box.appendChild(el("p","wiz-sub",
+        "What the board says is shown beside each one. It doesn't stop you — it just makes sure you know what you're doing."));
+      var v = prepComplete() ? verdicts() : null;
+      var chips = el("div","chips");
+      EDGES.forEach(function(e){
+        var st = v && v[e.id] ? v[e.id].status : null;
+        var tag = st ? "  — " + (st === "on" ? "on" : st === "caution" ? "caution" : "off") : "";
+        var b = el("button","chip", e.name + tag); b.type = "button";
+        b.setAttribute("aria-pressed", IT.edge === e.id ? "true" : "false");
+        b.onclick = function(){ IT.edge = e.id; syncCautionStep(); wizRerender(); };
+        chips.appendChild(b);
+      });
+      var n = el("button","chip","Off-plan / no edge"); n.type = "button";
+      n.setAttribute("aria-pressed", IT.edge === "none" ? "true" : "false");
+      n.onclick = function(){ IT.edge = "none"; syncCautionStep(); wizRerender(); };
+      chips.appendChild(n);
+      box.appendChild(chips);
+
+      if(IT.edge && v && v[IT.edge]){
+        var st = v[IT.edge].status;
+        if(st === "off"){
+          box.appendChild(el("div","warn-hard",
+            "The board has this one off today: " + v[IT.edge].why.join("; ") +
+            ". Off means the setup can't exist, so whatever you're in, it isn't this. Worth picking the one it actually is."));
+        } else if(st === "caution"){
+          box.appendChild(el("div","banner",
+            "On caution: " + v[IT.edge].why.join("; ") + ". Minimum size, and the next screen wants your reason."));
+        }
+      } else if(IT.edge === "none"){
+        box.appendChild(el("div","banner",
+          "No edge means no idea, no stop logic and nothing to review against. It gets logged as exactly that."));
+      }
+    },
+    ready: function(){ return !!IT.edge; },
+    need: "Pick the edge — or off-plan, honestly"
+  };
+}
+
+/* The caution screen only earns its place when the board is actually
+   flagging the edge he picked — otherwise it's a screen that says
+   nothing, and those are the ones that make people stop reading. */
+function cautionNow(){
+  var v = prepComplete() ? verdicts() : null;
+  return !!(v && IT && v[IT.edge] && v[IT.edge].status === "caution");
+}
+function syncCautionStep(){
+  WIZ.steps = WIZ.steps.filter(function(s){ return !s._caution; });
+  if(cautionNow()) WIZ.steps.splice(WIZ.i + 1, 0, itStepCaution());
+}
+
+function itStepCaution(){
+  return {
+    say: "Why are you taking a caution trade?",
+    _caution: true,
+    render: function(box){
+      var v = prepComplete() ? verdicts() : null;
+      box.appendChild(el("h2","wiz-q","Why this one, on caution?"));
+      box.appendChild(el("p","wiz-sub",
+        v[IT.edge].why.join("; ") + ". Minimum size applies. Write what you see that the board can't."));
+      var ta = el("textarea");
+      ta.value = IT.cautionWhy || "";
+      ta.oninput = function(){ IT.cautionWhy = ta.value; };
+      box.appendChild(ta);
+    },
+    ready: function(){ return (IT.cautionWhy || "").trim().length > 3; },
+    need: "A caution trade costs you a reason in writing"
+  };
+}
+
+function itStepDir(){
+  return {
+    say: "Long or short?",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Long or short?"));
+      var chips = el("div","chips");
+      ["Long","Short"].forEach(function(o){
+        var b = el("button","chip", o); b.type = "button";
+        b.setAttribute("aria-pressed", IT.dir === o ? "true" : "false");
+        b.onclick = function(){ IT.dir = o; wizRerender(); };
+        chips.appendChild(b);
+      });
+      box.appendChild(chips);
+    },
+    ready: function(){ return !!IT.dir; },
+    need: "One or the other"
+  };
+}
+
+function itStepPrice(key, q, sub, label){
+  return {
+    say: q,
+    render: function(box){
+      box.appendChild(el("h2","wiz-q", q));
+      box.appendChild(el("p","wiz-sub", sub));
+      box.appendChild(el("label", null, label));
+      var inp = el("input"); inp.type = "text"; inp.className = "price";
+      inp.setAttribute("inputmode","decimal");
+      inp.placeholder = "0000.00";
+      inp.value = IT[key] || "";
+      inp.oninput = function(){ IT[key] = inp.value; if(key === "stop") wizRerender(); };
+      box.appendChild(inp);
+      if(key === "stop"){
+        var pts = riskPoints(IT);
+        if(pts){
+          box.appendChild(el("p","hint","That's " + pts + " of risk per contract."));
+        }
+        box.appendChild(el("label", null, "Target, if you have one"));
+        var tg = el("input"); tg.type = "text"; tg.className = "price";
+        tg.setAttribute("inputmode","decimal");
+        tg.placeholder = "POC 0000";
+        tg.value = IT.target || "";
+        tg.oninput = function(){ IT.target = tg.value; };
+        box.appendChild(tg);
+      }
+      setTimeout(function(){ inp.focus(); }, 40);
+    },
+    ready: function(){ return !!(IT[key] || "").trim(); },
+    need: label + " — the app can't work it out for you"
+  };
+}
+
+function itStepSize(){
+  return {
+    say: "How many contracts?",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","How many contracts?"));
+      var pts = riskPoints(IT);
+      box.appendChild(el("p","wiz-sub",
+        (pts ? "Stop is " + pts + " away. " : "") +
+        "Size comes off the stop and the budget, capped by the account's contract limit."));
+      var b = dailyBudget();
+      if(b){
+        box.appendChild(el("p","hint",
+          money(b.left) + " left of today's " + money(b.budget) + " budget on " + b.account.label + "."));
+      }
+      var v = prepComplete() ? verdicts() : null;
+      if(v && v[IT.edge] && v[IT.edge].status === "caution"){
+        box.appendChild(el("div","banner","Caution trade — minimum size."));
+      }
+      box.appendChild(el("label", null, "Contracts"));
+      var inp = el("input"); inp.type = "text"; inp.className = "price";
+      inp.setAttribute("inputmode","numeric"); inp.placeholder = "1";
+      inp.value = IT.size || "";
+      inp.oninput = function(){ IT.size = inp.value; };
+      box.appendChild(inp);
+      setTimeout(function(){ inp.focus(); }, 40);
+    },
+    ready: function(){ return !!(IT.size || "").trim(); },
+    need: "How many did you take?"
+  };
+}
+
+var MUST_HOLD = [
+  "The level holds",
+  "No acceptance through the decision line",
+  "It stays this side of VWAP",
+  "The POC stays untagged",
+  "The trend stays intact",
+  "Sellers keep failing at the extreme"
+];
+
+function itStepMustHold(){
+  return {
+    say: "What has to stay true for this to work?",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","What has to stay true?"));
+      box.appendChild(el("p","wiz-sub",
+        "One line. This is the sentence the app reads back to you every check-in — when it stops being true, the trade is over whatever the P&L says."));
+      var chips = el("div","chips");
+      MUST_HOLD.forEach(function(m){
+        var b = el("button","chip", m); b.type = "button";
+        b.setAttribute("aria-pressed", IT.mustHold === m ? "true" : "false");
+        b.onclick = function(){ IT.mustHold = m; wizRerender(); };
+        chips.appendChild(b);
+      });
+      box.appendChild(chips);
+      box.appendChild(el("label", null, "Or write it yourself"));
+      var inp = el("input"); inp.type = "text";
+      inp.placeholder = "e.g. 5480 holds on a retest";
+      inp.value = MUST_HOLD.indexOf(IT.mustHold) < 0 ? (IT.mustHold || "") : "";
+      inp.oninput = function(){ IT.mustHold = inp.value; };
+      box.appendChild(inp);
+    },
+    ready: function(){ return (IT.mustHold || "").trim().length > 2; },
+    need: "One line — without it a check-in has nothing to measure against"
+  };
+}
+
+function itStepConfirm(){
+  return {
+    say: "That's the position logged.",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","In the trade"));
+      var v = prepComplete() ? verdicts() : null;
+      var st = v && v[IT.edge] ? v[IT.edge].status : "n/a";
+      var d = day();
+      var t = {
+        n: d.trades.length + 1,
+        time: nowHM(),
+        openedAt: new Date().toISOString(),
+        edge: IT.edge, dir: IT.dir, size: IT.size,
+        entry: IT.entry, stop: IT.stop, target: IT.target || "",
+        plannedStop: IT.stop,
+        mustHold: IT.mustHold, cautionWhy: IT.cautionWhy || "",
+        exit:"", mae:"", result:"",
+        tags: tagSnapshot(), status: st,
+        live: true, checkins: [], review: null
+      };
+      /* re-entering this screen with Back mustn't stack duplicates */
+      var existing = liveTrade();
+      if(existing){ Object.keys(t).forEach(function(k){
+        if(k !== "n" && k !== "time" && k !== "openedAt" && k !== "checkins") existing.t[k] = t[k];
+      }); }
+      else d.trades.push(t);
+      save();
+      var live = liveTrade().t;
+
+      box.appendChild(el("p","wiz-sub",
+        "T" + live.n + " is open. The bar at the top follows you around the app — it'll go amber when a check-in is due."));
+
+      var legs = el("div","trade-legs");
+      [["ENTRY", live.entry],["STOP", live.stop],["TARGET", live.target],["RISK", riskPoints(live)]]
+        .forEach(function(p){
+          var dd = el("div");
+          dd.appendChild(el("span", null, p[0]));
+          dd.appendChild(document.createTextNode(p[1] || "—"));
+          legs.appendChild(dd);
+        });
+      box.appendChild(legs);
+
+      var mh = el("p","hint"); mh.style.marginTop = "12px";
+      mh.appendChild(el("b", null, "Has to stay true: "));
+      mh.appendChild(document.createTextNode(live.mustHold));
+      box.appendChild(mh);
+
+      var when = +S.ciFirst > 0
+        ? "First check-in due in " + S.ciFirst + " minutes."
+        : "First check-in nudge is switched off — use the button whenever you want it.";
+      box.appendChild(el("p","hint", when));
+      renderLiveBar();
+    },
+    ready: function(){ return true; },
+    need: ""
+  };
+}
+
+/* ---------------------------------------------------------------------
+   The check-in itself
+--------------------------------------------------------------------- */
+var CI = null;
+
+function openCheckin(){
+  var L = liveTrade();
+  if(!L){ toast("Nothing open to check in on"); return; }
+  var t = L.t;
+  CI = { t: nowHM(), at: new Date().toISOString(),
+         holds:"", stop:"", stopNew:"", stopWhy:"", feel:[], note:"" };
+
+  WIZ.steps = [ ciStepHolds(t), ciStepStop(t), ciStepFeel(t), ciStepNote(t) ];
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+  WIZ.onClose = function(){
+    /* an abandoned check-in still counts if the first answer was given —
+       that's the one that matters, and losing it would be worse */
+    if(CI && CI.holds && (t.checkins || []).indexOf(CI) < 0) t.checkins.push(CI);
+    CI = null; save(); renderJournal(); renderLiveBar();
+  };
+}
+
+function ciStepHolds(t){
+  return {
+    say: "Does it still hold? " + t.mustHold,
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Does it still hold?"));
+      box.appendChild(el("p","wiz-sub",
+        "You wrote this when you got in, " + minsSince(t.openedAt) + " minutes ago:"));
+      var q = el("div","binding");
+      q.appendChild(el("div","big", t.mustHold));
+      q.style.padding = "12px 14px";
+      box.appendChild(q);
+
+      var chips = el("div","chips");
+      [["yes","Yes, still true"],["unsure","Not sure"],["no","No — it's gone"]].forEach(function(o){
+        var b = el("button","chip", o[1]); b.type = "button";
+        b.setAttribute("aria-pressed", CI.holds === o[0] ? "true" : "false");
+        b.onclick = function(){ CI.holds = o[0]; wizRerender(); };
+        chips.appendChild(b);
+      });
+      box.appendChild(chips);
+
+      if(CI.holds === "no"){
+        box.appendChild(el("div","warn-hard",
+          "Then the premise is dead and the trade is over — acceptance through the level kills it, and waiting for the stop is just paying for information you already have. That's the method, not a rule the app is adding."));
+        var b = el("button","btn wide"); b.type = "button";
+        b.textContent = "Close it now"; b.style.marginTop = "10px";
+        b.onclick = function(){
+          if(t.checkins.indexOf(CI) < 0) t.checkins.push(CI);
+          CI = null; save();
+          WIZ.onClose = null;
+          closeWiz();
+          openCloseOut();
+        };
+        box.appendChild(b);
+        box.appendChild(el("p","hint",
+          "Or carry on through the check-in if you're staying in it anyway — it gets recorded either way."));
+      } else if(CI.holds === "unsure"){
+        box.appendChild(el("div","banner",
+          "Not sure is worth saying out loud. If you can't tell whether the reason is intact, you're holding on hope rather than on the read — say what would settle it in the note at the end."));
+      }
+    },
+    ready: function(){ return !!CI.holds; },
+    need: "Yes, no, or honestly not sure"
+  };
+}
+
+function ciStepStop(t){
+  return {
+    say: "Where's your stop now?",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Where's your stop now?"));
+      box.appendChild(el("p","wiz-sub",
+        "You went in with it at " + t.plannedStop + ". Where is it sitting at this moment?"));
+      var chips = el("div","chips");
+      [["same","Where it started"],["be","Moved to break-even"],
+       ["tighter","Tightened"],["wider","Widened"]].forEach(function(o){
+        var b = el("button","chip", o[1]); b.type = "button";
+        b.setAttribute("aria-pressed", CI.stop === o[0] ? "true" : "false");
+        b.onclick = function(){ CI.stop = o[0]; wizRerender(); };
+        chips.appendChild(b);
+      });
+      box.appendChild(chips);
+
+      if(CI.stop && CI.stop !== "same"){
+        box.appendChild(el("label", null, "Where is it now?"));
+        var inp = el("input"); inp.type = "text"; inp.className = "price";
+        inp.setAttribute("inputmode","decimal"); inp.placeholder = "0000.00";
+        inp.value = CI.stopNew || "";
+        inp.oninput = function(){ CI.stopNew = inp.value; t.stop = inp.value; save(); };
+        box.appendChild(inp);
+      }
+      if(CI.stop === "wider"){
+        box.appendChild(el("div","banner",
+          "Noted, not judged — you haven't told the app that widening is against your rules, so it isn't treating it as one. It goes in the record and comes back at you in the review, where you can decide what it means."));
+        box.appendChild(el("label", null, "In a line, why did it move out?"));
+        var w = el("input"); w.type = "text";
+        w.placeholder = "e.g. the level was two points wider than I marked it";
+        w.value = CI.stopWhy || "";
+        w.oninput = function(){ CI.stopWhy = w.value; };
+        box.appendChild(w);
+      }
+    },
+    ready: function(){
+      if(!CI.stop) return false;
+      if(CI.stop === "wider") return (CI.stopWhy || "").trim().length > 3;
+      return true;
+    },
+    need: "Where the stop is right now — and a line on why, if it moved out"
+  };
+}
+
+var FEELINGS = ["Calm","Itchy","Hoping","Bored","Want to add","Want to bail","Frustrated","Sharp"];
+
+function ciStepFeel(t){
+  return {
+    say: "How are you actually feeling about it?",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","How are you actually feeling?"));
+      box.appendChild(el("p","wiz-sub",
+        "Not how you should feel. Tap whatever's true — more than one if it is."));
+      var chips = el("div","chips");
+      FEELINGS.forEach(function(f){
+        var on = CI.feel.indexOf(f) > -1;
+        var b = el("button","chip", f); b.type = "button";
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+        b.onclick = function(){
+          var i = CI.feel.indexOf(f);
+          if(i > -1) CI.feel.splice(i,1); else CI.feel.push(f);
+          wizRerender();
+        };
+        chips.appendChild(b);
+      });
+      box.appendChild(chips);
+      if(CI.feel.indexOf("Want to add") > -1){
+        box.appendChild(el("div","banner",
+          "Adding is a second trade with its own idea, stop and entry. If it deserves those three, close this check-in and open it properly. If it doesn't, it's just size chasing a feeling."));
+      }
+      if(CI.feel.indexOf("Hoping") > -1 || CI.feel.indexOf("Want to bail") > -1){
+        box.appendChild(el("div","banner",
+          "Both of those are about the P&L rather than the level. The line you wrote at the top is the thing that decides this — not the number in the corner."));
+      }
+    },
+    ready: function(){ return CI.feel.length > 0; },
+    need: "One tap — even 'calm' is data"
+  };
+}
+
+function ciStepNote(t){
+  return {
+    say: "Anything to note?",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Anything to note?"));
+      box.appendChild(el("p","wiz-sub",
+        "Optional. What price is doing, what you're watching for next, what would settle it. It ends up in the review."));
+      var ta = el("textarea");
+      ta.value = CI.note || "";
+      ta.oninput = function(){ CI.note = ta.value; };
+      box.appendChild(ta);
+
+      /* commit here rather than on close, so Done is Done */
+      if((t.checkins || []).indexOf(CI) < 0) t.checkins.push(CI);
+      save();
+
+      var n = t.checkins.length;
+      box.appendChild(el("p","hint",
+        "Check-in " + n + " recorded. Next one due in " +
+        (+S.ciEvery > 0 ? S.ciEvery + " minutes." : "— repeat nudges are off.")));
+      var out = el("button","btn wide"); out.type = "button";
+      out.textContent = "I'm out of the trade"; out.style.marginTop = "12px";
+      out.onclick = function(){ WIZ.onClose = null; CI = null; save(); closeWiz(); openCloseOut(); };
+      box.appendChild(out);
+    },
+    ready: function(){ return true; },
+    need: ""
+  };
+}
+
+/* ---------------------------------------------------------------------
+   Closing out
+--------------------------------------------------------------------- */
+function openCloseOut(){
+  var L = liveTrade();
+  if(!L){ toast("Nothing open"); return; }
+  var t = L.t;
+
+  WIZ.steps = [
+    {
+      say: "Where did you get out?",
+      render: function(box){
+        box.appendChild(el("h2","wiz-q","Where did you get out?"));
+        box.appendChild(el("p","wiz-sub",
+          "T" + t.n + ", in at " + t.entry + ", " + minsSince(t.openedAt) + " minutes ago."));
+        box.appendChild(el("label", null, "Exit price"));
+        var inp = el("input"); inp.type = "text"; inp.className = "price";
+        inp.setAttribute("inputmode","decimal"); inp.placeholder = "0000.00";
+        inp.value = t.exit || "";
+        inp.oninput = function(){ t.exit = inp.value; save(); };
+        box.appendChild(inp);
+        setTimeout(function(){ inp.focus(); }, 40);
+      },
+      ready: function(){ return !!(t.exit || "").trim(); },
+      need: "The price you got out at"
+    },
+    {
+      say: "How far did it go against you?",
+      render: function(box){
+        box.appendChild(el("h2","wiz-q","Worst point against you"));
+        box.appendChild(el("p","wiz-sub",
+          "The real risk you took, not the one you planned. The gap between this and your stop is where the holes show up."));
+        box.appendChild(el("label", null, "Worst price it traded against you"));
+        var inp = el("input"); inp.type = "text"; inp.className = "price";
+        inp.setAttribute("inputmode","decimal"); inp.placeholder = "0000.00";
+        inp.value = t.mae || "";
+        inp.oninput = function(){ t.mae = inp.value; save(); };
+        box.appendChild(inp);
+        setTimeout(function(){ inp.focus(); }, 40);
+      },
+      ready: function(){ return true; },
+      need: ""
+    },
+    {
+      say: "What did it come to?",
+      render: function(box){
+        box.appendChild(el("h2","wiz-q","Result"));
+        box.appendChild(el("p","wiz-sub","Money, with a minus sign if it was a loss."));
+        box.appendChild(el("label", null, "Profit or loss"));
+        var inp = el("input"); inp.type = "text"; inp.className = "price";
+        inp.setAttribute("inputmode","text"); inp.placeholder = "e.g. -37.50";
+        inp.value = t.result || "";
+        inp.oninput = function(){ t.result = inp.value; save(); };
+        box.appendChild(inp);
+        setTimeout(function(){ inp.focus(); }, 40);
+      },
+      ready: function(){ return !!(t.result || "").trim(); },
+      need: "The number, even if you don't like it"
+    },
+    {
+      say: "Out. The review is where this pays.",
+      render: function(box){
+        t.live = false;
+        t.closedAt = new Date().toISOString();
+        t.heldMins = minsSince(t.openedAt);
+        save();
+        renderLiveBar();
+
+        box.appendChild(el("h2","wiz-q","Out of T" + t.n));
+        var num = parseFloat(String(t.result).replace(/[^0-9.\-]/g,""));
+        box.appendChild(el("p","wiz-sub",
+          "Held " + t.heldMins + " minutes, " + (t.checkins || []).length +
+          " check-in" + ((t.checkins || []).length === 1 ? "" : "s") + " along the way" +
+          (isNaN(num) ? "." : ", " + (num >= 0 ? "+" : "") + t.result + ".")));
+
+        var gone = (t.checkins || []).filter(function(c){ return c.holds === "no"; });
+        if(gone.length){
+          box.appendChild(el("div","banner",
+            "You logged at " + gone[0].t + " that the reason had gone, and stayed in " +
+            minsSince(gone[0].at) + " minutes past that. Worth being honest about in the review."));
+        }
+        var wide = (t.checkins || []).filter(function(c){ return c.stop === "wider"; });
+        if(wide.length){
+          box.appendChild(el("div","banner",
+            "The stop moved out " + wide.length + " time" + (wide.length === 1 ? "" : "s") +
+            " while you were in. Your reason at the time: " + wide[0].stopWhy));
+        }
+
+        var b = el("button","btn wide"); b.type = "button";
+        b.textContent = "Four-minute review now"; b.style.marginTop = "12px";
+        b.onclick = function(){
+          var idx = day().trades.indexOf(t);
+          WIZ.onClose = null; closeWiz(); openReview(idx);
+        };
+        box.appendChild(b);
+        box.appendChild(el("p","hint","Or later — it'll be sitting there unreviewed until you do."));
+      },
+      ready: function(){ return true; },
+      need: ""
+    }
+  ];
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+  WIZ.onClose = function(){ renderJournal(); renderLiveBar(); };
+}
+
+/* The bar's clock. Ten seconds is often enough for a minute counter and
+   quiet enough not to fight the rest of the app for the main thread. */
+setInterval(function(){ if(liveTrade()) renderLiveBar(); }, 10000);
 
 function tradeCard(t, i){
   var num = parseFloat(String(t.result).replace(/[^0-9.\-]/g, ""));
@@ -3218,6 +4116,21 @@ function tradeCard(t, i){
     legs.appendChild(dd);
   });
   card.appendChild(legs);
+
+  if((t.checkins || []).length){
+    var cd = el("details");
+    cd.appendChild(el("summary", null,
+      t.checkins.length + " check-in" + (t.checkins.length === 1 ? "" : "s") +
+      (t.heldMins != null ? " over " + t.heldMins + " minutes" : "")));
+    if(t.mustHold){
+      var mh = el("p","hint"); mh.style.margin = "6px 0 0";
+      mh.appendChild(el("b", null, "Had to stay true: "));
+      mh.appendChild(document.createTextNode(t.mustHold));
+      cd.appendChild(mh);
+    }
+    cd.appendChild(checkinList(t));
+    card.appendChild(cd);
+  }
 
   if(t.review){
     card.appendChild(el("div","rev-done","Reviewed"));
@@ -3256,6 +4169,7 @@ function tradeCard(t, i){
 function dayTotals(){
   var d = day(), n = 0, wins = 0, sum = 0, counted = 0;
   d.trades.forEach(function(t){
+    if(t.live) return;               /* still open — not a result yet */
     n++;
     var r = parseFloat(String(t.result).replace(/[^0-9.\-]/g, ""));
     if(!isNaN(r)){ counted++; sum += r; if(r >= 0) wins++; }
@@ -3281,6 +4195,21 @@ function openReview(i){
       box.appendChild(el("h2","wiz-q","T" + t.n + " — four-minute review"));
       box.appendChild(el("p","wiz-sub",
         "Risk taken is how far it actually went against you, not what you planned. That gap is where the holes show."));
+
+      /* what you said while you were in it, rather than what you
+         remember now — the two are rarely the same */
+      if((t.checkins || []).length){
+        var rec = el("div","card"); rec.style.marginBottom = "14px";
+        rec.appendChild(el("h3", null, "What you said while you were in it"));
+        if(t.mustHold){
+          var mh = el("p","hint");
+          mh.appendChild(el("b", null, "Had to stay true: "));
+          mh.appendChild(document.createTextNode(t.mustHold));
+          rec.appendChild(mh);
+        }
+        rec.appendChild(checkinList(t));
+        box.appendChild(rec);
+      }
 
       var mLab = el("label", null, "Worst point against you");
       var mIn = el("input"); mIn.type = "text"; mIn.className = "price";
@@ -4991,6 +5920,7 @@ function renderAll(){
   safely("ideas", renderIdeas); safely("prepLock", renderPrepLock);
   safely("journal", renderJournal); safely("risk", renderRisk);
   safely("coach", renderCoach); safely("nudge", ruleStaleNudge);
+  safely("liveBar", renderLiveBar);
   tickClocks(); measureHeader(); placeClocks();
   applySplit();
 }
