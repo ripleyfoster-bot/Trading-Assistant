@@ -446,6 +446,21 @@ nav .ico{font-size:17px;line-height:1}
   body.coach-full #v-coach .sub{max-width:none;margin-left:0;margin-right:0;width:100%}
   body.coach-full #v-coach .msg{max-width:78%}
   #v-coach h2{margin-top:0}
+
+  /* Guided prep is a layer over the app, and a full-window layer buries
+     the coach panel you deliberately switched on. With the split live it
+     takes the work column only — header, sidebar and coach all stay put,
+     so you can ask about the step you're looking at. Split off or coach
+     at full width there is nothing beside it worth keeping, so it covers
+     the lot as before. */
+  body.split-on:not(.coach-full) .wiz{
+    top:var(--hdr-h,96px);left:150px;right:40%;bottom:0;
+    border-left:1px solid var(--line);border-right:1px solid var(--line);
+  }
+  body.split-on.coach-left:not(.coach-full) .wiz{
+    left:calc(150px + 40%);right:0;
+  }
+  body.split-on:not(.coach-full) .wiz-top{padding-top:12px}
 }
 
 
@@ -919,7 +934,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "4.4";
+var APP_VERSION = "4.5";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -2129,7 +2144,14 @@ function go(name){
 }
 
 document.querySelectorAll("nav button").forEach(function(b){
-  b.onclick = function(){ go(b.dataset.go); };
+  b.onclick = function(){
+    /* with the sidebar visible beside guided prep, a nav tap has to mean
+       something — it leaves the flow rather than quietly switching the
+       screen underneath it. Answers are saved as you go, so nothing is
+       lost by stepping out. */
+    if($("wiz").classList.contains("on")) closeWiz();
+    go(b.dataset.go);
+  };
 });
 
 $("focusFree").oninput = function(){
@@ -2776,6 +2798,22 @@ function renderCoach(){
   out.lastChild && out.lastChild.scrollIntoView({ block:"end" });
 }
 
+/* Which screen he is actually looking at. During a guided flow the view
+   behind is meaningless — what matters is the step in front of him, so
+   the coach is told that instead and "why does this matter?" lands. */
+function whereNow(){
+  var w = { prep:"the prep screen", board:"the edge board", plan:"his trade ideas",
+            journal:"the journal", risk:"accounts and risk", coach:"the coach",
+            set:"settings" }[CURRENT] || "the app";
+  var wiz = $("wiz");
+  if(wiz && wiz.classList.contains("on") && WIZ.steps && WIZ.steps.length){
+    var s = WIZ.steps[WIZ.i] || {};
+    w = "a guided step-by-step flow, step " + (WIZ.i + 1) + " of " + WIZ.steps.length +
+        (s.say ? " — the step on screen asks: " + s.say : "");
+  }
+  return w;
+}
+
 async function sendCoach(){
   var box = $("chatIn"), q = box.value.trim();
   var shots = (SHOTS.__coach || []).slice();
@@ -2803,9 +2841,7 @@ async function sendCoach(){
       ? " [attached: " + m.shots.map(function(s){ return s.name; }).join(", ") + "]" : "");
     return { role: m.role === "user" ? "user" : "assistant", content: t };
   });
-  var where = { prep:"the prep screen", board:"the edge board", plan:"his trade ideas",
-                journal:"the journal", risk:"accounts and risk", coach:"the coach",
-                set:"settings" }[CURRENT] || "the app";
+  var where = whereNow();
   var lastContent;
   if(shots.length){
     lastContent = shots.map(function(s){
@@ -2819,7 +2855,8 @@ async function sendCoach(){
       "Today's prep and board:\n" + dayContext() + "\n\nQuestion: " + q
     });
   } else {
-    lastContent = "Today's prep and board:\n" + dayContext() + "\n\nQuestion: " + q;
+    lastContent = "He is on " + where + ".\n\nToday's prep and board:\n" +
+                  dayContext() + "\n\nQuestion: " + q;
   }
   msgs[msgs.length - 1] = { role: "user", content: lastContent };
 
