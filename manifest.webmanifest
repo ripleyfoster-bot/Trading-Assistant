@@ -1,0 +1,31 @@
+{
+  "name": "Trading Assistant",
+  "short_name": "Trading",
+  "description": "Pre-market prep, edge permission board, risk engine and journal.",
+  "display": "standalone",
+  "background_color": "#12161b",
+  "theme_color": "#12161b",
+  "orientation": "any",
+  "start_url": "./",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
