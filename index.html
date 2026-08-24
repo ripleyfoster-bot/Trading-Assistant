@@ -979,7 +979,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "4.6";
+var APP_VERSION = "4.7";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -2623,8 +2623,79 @@ function wizStepBoard(){
   };
 }
 
+/* The wall goes on before anything else, and comes off nothing but a
+   fresh morning. Locked the moment a position exists — a limit that can
+   be moved at 2pm isn't a limit. */
+function wizStepLossLimit(){
+  return {
+    say: "What's your daily loss limit today?",
+    render: function(box){
+      var d = day(), cfg = riskCfg(), c = lossLimitCeilings();
+      var locked = d.trades.length > 0;
+      box.appendChild(el("h2","wiz-q","Today's daily loss limit"));
+
+      if(locked){
+        box.appendChild(el("p","wiz-sub",
+          "Locked — you're " + d.trades.length + " trade" + (d.trades.length === 1 ? "" : "s") +
+          " in. Today's figure stands until tomorrow."));
+        box.appendChild(el("div","banner", money(+d.lossLimit || +cfg.maxDailyLoss || 0) + " for today."));
+        return;
+      }
+
+      box.appendChild(el("p","wiz-sub",
+        "The one hard wall in this app. Set it now — it locks as soon as you log a trade."));
+
+      if(c){
+        var lines = [];
+        if(c.firm > 0) lines.push(c.account.label + " — firm's limit " + money(c.firm));
+        lines.push(c.account.label + " — room left " + money(c.room));
+        box.appendChild(el("p","hint",
+          lines.join(" · ") + ". Yours has to sit under " +
+          (c.firmBinds ? "the firm's" : "the room") + ", so " + money(c.cap) + " is the ceiling."));
+      } else {
+        box.appendChild(el("p","hint","No live account to check against — nothing to compare your figure to."));
+      }
+
+      box.appendChild(el("label", null, "My daily loss limit for today ($)"));
+      var inp = el("input"); inp.type = "text"; inp.className = "price";
+      inp.setAttribute("inputmode","decimal");
+      inp.placeholder = (+cfg.maxDailyLoss || 0) ? String(+cfg.maxDailyLoss) : "e.g. 250";
+      inp.value = (d.lossLimit !== undefined && d.lossLimit !== null && d.lossLimit !== "")
+        ? d.lossLimit : ((+cfg.maxDailyLoss || 0) ? String(+cfg.maxDailyLoss) : "");
+      box.appendChild(inp);
+
+      var msg = el("div"); msg.style.marginTop = "10px";
+      box.appendChild(msg);
+
+      function judge(){
+        msg.textContent = "";
+        var raw = inp.value;
+        if(!String(raw).trim()) return;
+        var r = checkLossLimit(raw);
+        if(!r.ok){
+          msg.appendChild(el("div","banner", r.why));
+        } else {
+          d.lossLimit = String(parseFloat(String(raw).replace(/[^0-9.\-]/g,"")));
+          save();
+          if(r.warn) msg.appendChild(el("div","banner", r.warn));
+          else msg.appendChild(el("p","hint","Set. " + money(+d.lossLimit) + " is the wall for today."));
+        }
+      }
+      inp.oninput = judge;
+      judge();
+      setTimeout(function(){ inp.focus(); }, 40);
+    },
+    ready: function(){
+      var d = day();
+      if(d.trades.length > 0) return true;
+      return checkLossLimit(d.lossLimit).ok;
+    },
+    need: "A figure the app will accept — it can't sit above the firm's limit or the room left"
+  };
+}
+
 function buildWiz(){
-  var steps = [ wizStepFocus(), wizStepNews() ];
+  var steps = [ wizStepFocus(), wizStepLossLimit(), wizStepNews() ];
   VIEWS.forEach(function(v){ steps.push(wizStepView(v)); });
   /* only the facts nothing else has answered — think about what's needed now */
   FACTS.forEach(function(f){
@@ -3486,8 +3557,8 @@ function startInTrade(){
   /* the one wall with no door */
   var b = dailyBudget();
   if(b && b.blown){
-    alert("Daily loss limit reached — " + money(b.used) + " of a " + money(b.budget) +
-      " budget on " + b.account.label + ".\n\nThat's the hard wall. No new position today, and no reason gets round it. " +
+    alert("Daily loss limit reached — " + money(b.used) + " of the " + money(b.budget) +
+      " limit you set for today, on " + b.account.label + ".\n\nThat's the hard wall. No new position today, and no reason gets round it. " +
       "If you're already filled at your broker, close it there and log it below as a finished trade.");
     return;
   }
@@ -4491,7 +4562,8 @@ function uid(){ return Math.random().toString(36).slice(2,9); }
 function firms(){ S.firms = S.firms || []; return S.firms; }
 function accounts(){ S.accounts = S.accounts || []; return S.accounts; }
 function riskCfg(){
-  S.risk = S.risk || { dailyPct:2, attempts:3, tickValue:5, groupLead:"", groupOn:false, followers:[] };
+  S.risk = S.risk || { maxDailyLoss:0, attempts:3, tickValue:5, groupLead:"", groupOn:false, followers:[] };
+  if(S.risk.maxDailyLoss === undefined) S.risk.maxDailyLoss = 0;
   return S.risk;
 }
 
@@ -4552,18 +4624,65 @@ function bindingAccount(){
   return list[0];
 }
 
+/* The two ceilings a daily loss limit has to sit under. The firm's own
+   limit is static and theirs; the room left is dynamic and moves every
+   day, which is why this is recomputed rather than stored. */
+function lossLimitCeilings(){
+  var b = bindingAccount();
+  if(!b) return null;
+  var firm = +b.a.firmDLL || 0;
+  var room = Math.max(0, b.s.buffer);
+  var firmBinds = firm > 0 && firm <= room;
+  return {
+    account: b.a, state: b.s,
+    firm: firm, room: room,
+    cap: firmBinds ? firm : room,
+    firmBinds: firmBinds
+  };
+}
+
+/* Refuses rather than warns: a limit above either ceiling can never
+   fire, because something else ends the day first. */
+function checkLossLimit(n){
+  var v = parseFloat(String(n).replace(/[^0-9.\-]/g, ""));
+  var c = lossLimitCeilings();
+  if(isNaN(v) || v <= 0)
+    return { ok:false, cap: c ? c.cap : 0, why:"A number above zero — the wall only works if there's a figure on it." };
+  if(!c) return { ok:true, cap:0 };
+  if(v > c.cap){
+    return { ok:false, cap:c.cap, why:
+      (c.firmBinds
+        ? "The firm's own daily loss limit on " + c.account.label + " is " + money(c.firm) + ", and they flatten you at it."
+        : "There's only " + money(c.room) + " of room left on " + c.account.label + " before it's blown.") +
+      " The most this app will hold today is " + money(c.cap) + "." };
+  }
+  if(c.cap - v <= 10){
+    return { ok:true, cap:c.cap, warn:
+      "That leaves " + money(c.cap - v) + " between your limit and " +
+      (c.firmBinds ? "the firm's" : "blowing " + c.account.label) +
+      ". Fine if you meant it." };
+  }
+  return { ok:true, cap:c.cap };
+}
+
+/* Today's confirmed figure if there is one, otherwise the stored
+   default. No percentage — 2% of remaining room went to nothing long
+   before the account did. */
 function dailyBudget(){
   var b = bindingAccount();
   if(!b) return null;
   var cfg = riskCfg();
-  var pct = +cfg.dailyPct || 0;
-  var budget = b.s.buffer * pct / 100;
+  var d = day();
+  var set = (d.lossLimit !== undefined && d.lossLimit !== null && d.lossLimit !== "");
+  var budget = set ? (+d.lossLimit || 0) : (+cfg.maxDailyLoss || 0);
   var used = todayRisked();
   return {
     account: b.a, state: b.s,
     budget: budget, used: used, left: Math.max(0, budget - used),
     attempts: +cfg.attempts || 0,
     taken: day().trades.length,
+    fromDefault: !set,
+    locked: d.trades.length > 0,
     blown: used >= budget && budget > 0
   };
 }
@@ -4670,6 +4789,16 @@ function budgetCard(){
   c.appendChild(el("p","hint",
     "Binding account: " + b.account.label + " — the tightest in the group, so it sets the day."));
   c.appendChild(el("div","big", money(b.left) + " left of " + money(b.budget)));
+
+  if(!b.budget){
+    c.appendChild(el("div","warn-hard",
+      "No daily loss limit set. There's no wall today until you set one — in prep, or in your risk settings below."));
+  } else if(b.fromDefault && !b.locked){
+    c.appendChild(el("p","hint",
+      "That's your stored default — confirm it in prep and it locks for the day."));
+  } else if(b.locked){
+    c.appendChild(el("p","hint","Locked for today. Change it tomorrow, not now."));
+  }
 
   var line = el("p","hint");
   line.textContent = b.taken + " of " + b.attempts + " attempts used · " +
@@ -4854,14 +4983,25 @@ function riskSettingsCard(){
   c.appendChild(el("p","hint",
     "Set before the session and left alone. Changes belong after the close, not during."));
   var grid = el("div","levels-grid");
-  [["dailyPct","Daily risk % of room"],["attempts","Attempts per day"],
+  [["maxDailyLoss","My daily loss limit ($)"],["attempts","Attempts per day"],
    ["tickValue","$ per point per contract"]].forEach(function(f){
     var box = el("div");
     box.appendChild(el("label", null, f[1]));
     var inp = el("input"); inp.type = "text"; inp.className = "price";
     inp.value = cfg[f[0]];
     inp.oninput = function(){ cfg[f[0]] = inp.value; save(); };
-    inp.onchange = function(){ renderRisk(); };
+    inp.onchange = function(){
+      if(f[0] === "maxDailyLoss"){
+        var r = checkLossLimit(cfg.maxDailyLoss);
+        if(!r.ok && String(cfg.maxDailyLoss).trim()){
+          toast(r.why);
+          cfg.maxDailyLoss = r.cap ? String(r.cap) : "";
+          inp.value = cfg.maxDailyLoss;
+          save();
+        }
+      }
+      renderRisk();
+    };
     box.appendChild(inp); grid.appendChild(box);
   });
   c.appendChild(grid);
@@ -5036,7 +5176,8 @@ var ACCT_FIELDS = [
   { k:"acctNo", label:"Account number", type:"text" },
   { k:"minPayoutBalance", label:"Min. payout balance, from the dashboard ($)", type:"num" },
   { k:"profitTarget", label:"Profit target ($)", type:"num" },
-  { k:"contractLimit", label:"Max contracts (micros)", type:"num" }
+  { k:"contractLimit", label:"Max contracts (micros)", type:"num" },
+  { k:"firmDLL", label:"Firm's daily loss limit ($, 0 if none)", type:"num" }
 ];
 var PAYOUT_FIELDS = [
   { k:"qualDays", label:"Qualifying days banked" },
