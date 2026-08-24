@@ -333,6 +333,11 @@ nav .ico{font-size:17px;line-height:1}
 .msg.me{align-self:flex-end;background:var(--acc);color:var(--acc-ink);border-bottom-right-radius:5px}
 .msg.ai{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:5px}
 .msg.ai .speak{margin-top:7px;display:inline-block}
+.msg strong{font-weight:680}
+.msg em{font-style:italic}
+.msg code{font:600 12.5px/1.4 var(--f-data);background:var(--line);
+  padding:1px 5px;border-radius:5px}
+.msg .md-rule{border:0;border-top:1px solid var(--line);margin:9px 0}
 .chat-input{display:flex;gap:8px;position:sticky;bottom:calc(64px + env(safe-area-inset-bottom))}
 .chat-input textarea{flex:1;min-height:46px;max-height:120px}
 .chat-input .btn{align-self:flex-end}
@@ -726,9 +731,19 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
     </div>
   </div>
 
-  <!-- 2 news -->
+  <!-- 2 daily loss limit -->
   <div class="step" id="step2">
     <div class="step-n">2</div>
+    <div class="card">
+      <h3>Today's daily loss limit</h3>
+      <p class="hint">The one hard wall in this app. It locks as soon as you log a trade.</p>
+      <div id="lossLimitBox"></div>
+    </div>
+  </div>
+
+  <!-- 3 news -->
+  <div class="step" id="step3">
+    <div class="step-n">3</div>
     <div class="card">
       <h3>News events</h3>
       <p class="hint">What's on the calendar that could move the auction.</p>
@@ -746,8 +761,8 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   </div>
 
   <!-- 3 observations -->
-  <div class="step" id="step3">
-    <div class="step-n">3</div>
+  <div class="step" id="step4">
+    <div class="step-n">4</div>
     <div class="card">
       <h3>Timeframe observations</h3>
       <p class="hint">Six views, in order. Note what you see and tag who's in control. No trade ideas yet.</p>
@@ -756,8 +771,8 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   </div>
 
   <!-- 4 facts -->
-  <div class="step" id="step4">
-    <div class="step-n">4</div>
+  <div class="step" id="step5">
+    <div class="step-n">5</div>
     <div class="card">
       <h3>Structural facts</h3>
       <p class="hint">These, and the L/S/B tags above, are what the board actually computes from. Your written notes feed them via "Read this view" — they aren't read directly.</p>
@@ -767,8 +782,8 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   </div>
 
   <!-- 5 levels -->
-  <div class="step" id="step5">
-    <div class="step-n">5</div>
+  <div class="step" id="step6">
+    <div class="step-n">6</div>
     <div class="card">
       <h3>Levels</h3>
       <p class="hint">Zones, not lines. Roughly two points either side on mES.</p>
@@ -779,8 +794,8 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   </div>
 
   <!-- 6 analysis -->
-  <div class="step" id="step6">
-    <div class="step-n">6</div>
+  <div class="step" id="step7">
+    <div class="step-n">7</div>
     <div class="card">
       <h3>General analysis</h3>
       <p class="hint">Now you can interpret. What do you make of all that?</p>
@@ -979,7 +994,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "4.9";
+var APP_VERSION = "5.0";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1698,10 +1713,75 @@ function proposalBox(viewId){
    Speech. Reading works reliably on iPhone; dictation comes from
    the keyboard mic, which is Apple's engine and works everywhere.
 ----------------------------------------------------------------*/
+
+/* =====================================================================
+   The coach writes markdown. It used to be dropped in as plain text, so
+   ** showed as ** on screen and the speech engine read the asterisks
+   aloud. Both are fixed here.
+
+   Everything is built with createElement. Never innerHTML — this text
+   comes back from the model and can contain anything it read off a
+   screenshot, so the one place it must not be able to reach is the
+   HTML parser.
+
+   .msg is white-space:pre-wrap, so newlines are left as text nodes and
+   the browser lays them out. Only inline marks and rules are rewritten.
+===================================================================== */
+function mdInline(parent, s){
+  var re = /(\*\*(?![\s*])(?:[^*\n]*[^\s*])?\*\*|__(?![\s_])(?:[^_\n]*[^\s_])?__|`[^`\n]+`|\*(?![\s*])(?:[^*\n]*[^\s*])?\*)/g;
+  var last = 0, m;
+  while((m = re.exec(s)) !== null){
+    if(m.index > last) parent.appendChild(document.createTextNode(s.slice(last, m.index)));
+    var tok = m[0];
+    if(tok.slice(0,2) === "**")      parent.appendChild(el("strong", null, tok.slice(2,-2)));
+    else if(tok.slice(0,2) === "__") parent.appendChild(el("strong", null, tok.slice(2,-2)));
+    else if(tok.charAt(0) === "`")   parent.appendChild(el("code", null, tok.slice(1,-1)));
+    else                             parent.appendChild(el("em", null, tok.slice(1,-1)));
+    last = m.index + tok.length;
+  }
+  if(last < s.length) parent.appendChild(document.createTextNode(s.slice(last)));
+}
+
+function mdInto(parent, text){
+  var lines = String(text == null ? "" : text).split("\n");
+  lines.forEach(function(line, i){
+    if(/^\s*(---+|\*\*\*+|___+)\s*$/.test(line)){
+      parent.appendChild(el("hr","md-rule"));
+      return;                       /* the rule replaces the line break */
+    }
+    var l = line;
+    var h = l.match(/^\s*(#{1,6})\s+(.*)$/);
+    if(h){
+      var strong = el("strong");
+      mdInline(strong, h[2]);
+      parent.appendChild(strong);
+    } else {
+      /* a bullet is easier to read as a bullet than as a hyphen */
+      l = l.replace(/^(\s*)[-*+]\s+/, "$1• ");
+      mdInline(parent, l);
+    }
+    if(i < lines.length - 1) parent.appendChild(document.createTextNode("\n"));
+  });
+}
+
+/* What the speech engine should hear: the words, without the marks. */
+function stripMd(text){
+  return String(text == null ? "" : text)
+    .replace(/^\s*(---+|\*\*\*+|___+)\s*$/gm, "")
+    .replace(/^\s*#{1,6}\s+/gm, "")
+    .replace(/^(\s*)[-*+]\s+/gm, "$1")
+    .replace(/\*\*(?![\s*])((?:[^*\n]*[^\s*])?)\*\*/g, "$1")
+    .replace(/__(?![\s_])((?:[^_\n]*[^\s_])?)__/g, "$1")
+    .replace(/`([^`\n]+)`/g, "$1")
+    .replace(/\*(?![\s*])((?:[^*\n]*[^\s*])?)\*/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function speak(text){
   if(!("speechSynthesis" in window)){ toast("This device can't read aloud"); return; }
   if(speechSynthesis.speaking){ speechSynthesis.cancel(); return; }
-  var u = new SpeechSynthesisUtterance(text);
+  var u = new SpeechSynthesisUtterance(stripMd(text));
   u.rate = 1.02; u.pitch = 1;
   var vs = speechSynthesis.getVoices();
   var uk = vs.filter(function(v){ return /en-GB/i.test(v.lang); })[0];
@@ -1751,13 +1831,68 @@ function renderLevels(){
 function renderSteps(){
   var d = day();
   $("step1").classList.toggle("done", !!(d.focus || d.focusFree));
-  $("step2").classList.toggle("done", (d.news||[]).length > 0);
-  $("step3").classList.toggle("done",
+  renderLossLimitStep();
+  $("step2").classList.toggle("done", checkLossLimit(d.lossLimit).ok);
+  $("step3").classList.toggle("done", (d.news||[]).length > 0);
+  $("step4").classList.toggle("done",
     VIEWS.every(function(v){ return (d.views[v.id]||{}).tag; }));
-  $("step4").classList.toggle("done", factsAnswered() >= 10);
-  $("step5").classList.toggle("done",
+  $("step5").classList.toggle("done", factsAnswered() >= 10);
+  $("step6").classList.toggle("done",
     LEVELS.some(function(l){ return d.levels[l.id]; }) || !!d.extraLevels);
-  $("step6").classList.toggle("done", !!d.analysis);
+  $("step7").classList.toggle("done", !!d.analysis);
+}
+
+/* The same figure, the same ceilings and the same refusal as the guided
+   step — working down the page by hand used to skip the wall entirely. */
+function renderLossLimitStep(){
+  var box = $("lossLimitBox");
+  if(!box) return;
+  box.innerHTML = "";
+  var d = day(), cfg = riskCfg(), c = lossLimitCeilings();
+
+  if(d.trades.length > 0){
+    box.appendChild(el("div","banner",
+      money(+d.lossLimit || +cfg.maxDailyLoss || 0) + " for today — locked, you're " +
+      d.trades.length + " trade" + (d.trades.length === 1 ? "" : "s") + " in."));
+    return;
+  }
+
+  if(c){
+    var lines = [];
+    if(c.firm > 0) lines.push("firm's limit " + money(c.firm));
+    lines.push("room left " + money(c.room));
+    box.appendChild(el("p","hint",
+      c.account.label + " — " + lines.join(" · ") + ". Yours has to sit under " +
+      (c.firmBinds ? "the firm's" : "the room") + ", so " + money(c.cap) + " is the ceiling."));
+  } else {
+    box.appendChild(el("p","hint",
+      "No live account to check against — nothing to compare your figure to."));
+  }
+
+  box.appendChild(el("label", null, "My daily loss limit for today ($)"));
+  var inp = el("input"); inp.type = "text"; inp.className = "price";
+  inp.setAttribute("inputmode","decimal");
+  inp.placeholder = (+cfg.maxDailyLoss || 0) ? String(+cfg.maxDailyLoss) : "e.g. 250";
+  inp.value = (d.lossLimit !== undefined && d.lossLimit !== null && d.lossLimit !== "")
+    ? d.lossLimit : ((+cfg.maxDailyLoss || 0) ? String(+cfg.maxDailyLoss) : "");
+  box.appendChild(inp);
+
+  var msg = el("div"); msg.style.marginTop = "10px";
+  box.appendChild(msg);
+
+  inp.oninput = function(){
+    msg.textContent = "";
+    var raw = inp.value;
+    if(!String(raw).trim()) return;
+    var r = checkLossLimit(raw);
+    if(!r.ok){ msg.appendChild(el("div","banner", r.why)); return; }
+    d.lossLimit = String(parseFloat(String(raw).replace(/[^0-9.\-]/g,"")));
+    save();
+    if(r.warn) msg.appendChild(el("div","banner", r.warn));
+    else msg.appendChild(el("p","hint","Set. " + money(+d.lossLimit) + " is the wall for today."));
+    $("step2").classList.toggle("done", true);
+    renderHeader();
+  };
 }
 
 function renderBoard(){
@@ -2821,7 +2956,8 @@ var METHOD_BRIEF =
    inside, so it either deflects navigation questions to "support" or
    fills the gap with a plausible invention. Both happened. */
 var APP_BRIEF =
-  "\n\nYOU ARE ALSO THIS APP'S TECH SUPPORT. You know every screen and every input in it, listed below. " +
+  "\n\nOUTPUT VOICE — address him directly as \"you\". This brief and the daily context below describe him in the third person because they are notes to you about him, not speech. Never carry that into a reply: no \"he is on Settings\", no talking about him as though he were absent. He is the one reading it. " +
+  "YOU ARE ALSO THIS APP'S TECH SUPPORT. You know every screen and every input in it, listed below. " +
   "If he asks where something lives, how something works, or why the app is doing something, answer it directly and specifically — name the tab and the field. " +
   "Never tell him the app is outside your remit, never suggest contacting support, and never guess at a screen that isn't described here. " +
   "If something genuinely isn't in this brief, say you don't have that part of the app described to you rather than inventing it. " +
@@ -3013,7 +3149,7 @@ function renderCoach(){
       });
       b.appendChild(sh);
     }
-    b.appendChild(document.createTextNode(m.text));
+    mdInto(b, m.text);
     if(m.role === "assistant"){
       var s = el("button","speak","Read aloud"); s.type = "button";
       s.onclick = function(){ speak(m.text); };
