@@ -979,7 +979,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "4.7";
+var APP_VERSION = "4.8";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1017,7 +1017,10 @@ function todayKey(){
 function pad(n){ return (n<10?"0":"") + n; }
 
 function day(){
-  var k = S.currentDay || todayKey();
+  /* The calendar decides which day it is — not whatever was last saved.
+     Reading S.currentDay first pinned the app to the date it first ran,
+     so every trade, prep and review since landed in that one record. */
+  var k = todayKey();
   S.currentDay = k;
   if(!S.days[k]){
     var prev = lastDay();
