@@ -994,7 +994,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "5.0";
+var APP_VERSION = "5.1";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -3761,6 +3761,239 @@ var STOP_WORDS = {
 --------------------------------------------------------------------- */
 var IT = null;   /* the trade being opened */
 
+/* =====================================================================
+   Post-loss consultation
+   ---------------------------------------------------------------------
+   The counter is not stored. It is read off the journal every time, so
+   it can never drift out of step with the trades themselves, and it
+   resets overnight for free because the day record does.
+
+   Counts ANY losing trade however it was exited. Does not reset on a
+   winner — three losses and a win between them is still three losses.
+===================================================================== */
+
+function lossesToday(){
+  return (day().trades || []).filter(function(t){
+    if(t.live) return false;
+    var r = parseFloat(String(t.result).replace(/[^0-9.\-]/g, ""));
+    return !isNaN(r) && r < 0;
+  });
+}
+
+/* Ripley's table, 24 Aug. Deliberately not a formula — 5→2 is a 60% cut
+   while 6→3 is exactly half, and 3 acts as a ceiling from 6 to 9. Ten or
+   more contracts lost means the size itself was the problem, so it drops
+   back to 2 and says consolidate. Edit a row, not an equation. */
+var POST_LOSS_TABLE = { 1:1, 2:1, 3:2, 4:2, 5:2, 6:3, 7:3, 8:3, 9:3 };
+
+function postLossSuggest(lost){
+  var n = parseInt(lost, 10);
+  if(isNaN(n) || n < 1) return 1;
+  if(n >= 10) return 2;
+  return POST_LOSS_TABLE[n] || 1;
+}
+
+/* Reads the last losing trade only — not a compounding haircut. Two
+   losses on 6 then 3 gives 3 then 2; overriding upward in between is
+   read at face value next time. His call, 24 Aug. */
+function postLossState(){
+  var losses = lossesToday();
+  if(!losses.length) return null;
+  var last = losses[losses.length - 1];
+  var lost = parseInt(String(last.size).replace(/[^0-9]/g, ""), 10);
+  if(isNaN(lost)) lost = 0;
+  return {
+    count: losses.length,
+    losses: losses,
+    last: last,
+    lostSize: lost,
+    table: postLossSuggest(lost),
+    consult: losses.length >= 3
+  };
+}
+
+/* Stop distance as a number. riskPoints() returns a display string. */
+function riskPtsNum(t){
+  var e = parseFloat(String(t.entry).replace(/[^0-9.\-]/g, ""));
+  var s = parseFloat(String(t.stop).replace(/[^0-9.\-]/g, ""));
+  if(isNaN(e) || isNaN(s)) return 0;
+  return Math.abs(e - s);
+}
+
+/* The table proposes; the arithmetic disposes. A suggestion may never
+   exceed what the remaining budget, the firm's contract cap and the
+   tightest account already allow — and never falls below 1. */
+function postLossSize(PL, pts){
+  var out = { table: PL.table, suggest: PL.table, boundBy: "", perContract: 0,
+              budgetAllows: 0, cap: 0 };
+  var tick = +riskCfg().tickValue || 5;
+  var b = dailyBudget();
+  if(pts > 0){
+    out.perContract = pts * tick;
+    if(b && out.perContract > 0){
+      out.budgetAllows = Math.floor(b.left / out.perContract);
+      if(out.budgetAllows < out.suggest){
+        out.suggest = out.budgetAllows;
+        out.boundBy = "budget";
+      }
+    }
+  }
+  var bind = bindingAccount();
+  out.cap = bind ? (+bind.a.contractLimit || 0) : 0;
+  if(out.cap > 0 && out.cap < out.suggest){
+    out.suggest = out.cap;
+    out.boundBy = "cap";
+  }
+  /* The floor is 1 — a Contracts field can't usefully say zero. But one
+     contract at this stop can still cost more than the day has left, and
+     that is exactly the thing this screen exists to say out loud. */
+  out.underBudget = out.perContract > 0 && out.budgetAllows < 1;
+  if(out.suggest < 1){ out.suggest = 1; if(!out.boundBy) out.boundBy = "floor"; }
+  return out;
+}
+
+/* Canned first, real call replaces it in place. If the call fails, is
+   slow, or there is no key, the canned line simply stands — which is
+   also the offline path. */
+var POST_LOSS_CANNED = [
+  "That one's gone. Before the next: is this the trade you planned, or the one that makes the last one back? Those are different trades and only one of them has an edge.",
+  "One down. Worth a beat before you commit — are you calm enough for this to be a considered entry, or still carrying the last one?",
+  "Loss logged. The question that matters isn't what the market did, it's whether you're about to trade the setup or the feeling."
+];
+var POST_LOSS_CANNED_3 =
+  "Three now. Stop for a moment. This is the point where the day usually gets expensive — not from the losses so far, but from what comes after them. Talk it through with me before anything else.";
+
+function postLossCanned(PL){
+  if(PL.consult) return POST_LOSS_CANNED_3;
+  return POST_LOSS_CANNED[(PL.count - 1) % POST_LOSS_CANNED.length];
+}
+
+async function postLossCoachAsk(PL, node){
+  if(!S.apiKey) return;
+  var q =
+    "This is not a question from him — the app has opened the trade wizard after a loss and " +
+    "is showing him an automatic note from you. Write that note.\n\n" +
+    "He has taken " + PL.count + " losing trade" + (PL.count === 1 ? "" : "s") +
+    " today. The last was " + (PL.lostSize || "?") + " contracts on " +
+    (PL.last.edge || "no edge") + " " + (PL.last.dir || "") +
+    ", result " + (PL.last.result || "?") + ".\n\n" +
+    "Today's prep, board and trades:\n" + dayContext() + "\n\n" +
+    "Four sentences at most. Ask how he actually is — tilt, revenge, over-excitement, or " +
+    "genuinely fine — and open the door to talking the last trade through. " +
+    "If the losing trades share something (same edge, same direction, same hour, same mistake), " +
+    "name it, because he may not have noticed. " +
+    (PL.consult
+      ? "This is his third loss. Say plainly that you think the day is done and that the sensible " +
+        "move is to stop, without forbidding it — he can still trade and the app will let him. "
+      : "") +
+    "Do not give him a number of contracts, a dollar risk or any other risk figure — the app has " +
+    "already put a suggested size in front of him. Speak to him as 'you'.";
+  try{
+    var text = await callClaudeRaw([{ role:"user", content:q }], METHOD_BRIEF + APP_BRIEF);
+    text = String(text || "").trim();
+    if(!text) return;
+    /* into the thread as well, so he can just reply to it */
+    var d = day();
+    d.coach = d.coach || [];
+    d.coach.push({ role:"assistant", text: text });
+    save();
+    renderCoach();
+    /* the step may have been left by now — a detached node is harmless */
+    if(node && node.isConnected !== false){
+      node.innerHTML = "";
+      mdInto(node, text);
+    }
+  }catch(e){ /* canned line stands */ }
+}
+
+/* Desktop only, and only for as long as the wizard is open. S.split is
+   never written, so his saved preference survives and the next
+   applySplit() puts it back. */
+function postLossForceSplit(){
+  if(!isDesktop() || splitOn()) return;
+  document.body.classList.add("split-on");
+  var p = $("v-coach");
+  p.classList.add("on");
+  p.style.display = "";
+  renderCoach();
+  setTimeout(placeClocks, 30);
+}
+
+function itStepPostLoss(PL){
+  return {
+    say: PL.consult
+      ? "That's three losses today. Let's stop and look at this properly."
+      : "The last trade lost. One screen before the next one.",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q", PL.consult
+        ? "Three losses today"
+        : (PL.count === 1 ? "That last one lost" : "Two losses now")));
+
+      /* the arithmetic, in the plainest numbers available */
+      var b = dailyBudget();
+      var lostAmt = Math.abs(parseFloat(String(PL.last.result).replace(/[^0-9.\-]/g, "")) || 0);
+      var lines = [];
+      lines.push("Last trade: " + (PL.lostSize || "?") +
+        (PL.lostSize === 1 ? " contract" : " contracts") + " on " +
+        (PL.last.edge || "no edge") + ", " + money(lostAmt) + " gone.");
+      if(b){
+        lines.push(money(b.used) + " of your " + money(b.budget) +
+          " limit used. " + money(b.left) + " left on " + b.account.label + ".");
+        if(lostAmt > 0 && b.left > 0){
+          var more = Math.floor(b.left / lostAmt);
+          lines.push(more <= 0
+            ? "Another trade that size would take you past the limit."
+            : "That's " + more + " more trade" + (more === 1 ? "" : "s") +
+              " at the size that just lost.");
+        }
+      }
+      var p = el("div","banner");
+      lines.forEach(function(t){ p.appendChild(el("div", null, t)); });
+      box.appendChild(p);
+
+      /* the coach — canned now, real note when it lands */
+      var note = el("div","msg ai");
+      note.style.margin = "12px 0";
+      mdInto(note, postLossCanned(PL));
+      box.appendChild(note);
+      if(!IT.postLossAsked){
+        IT.postLossAsked = true;
+        postLossCoachAsk(PL, note);
+      }
+      if(!isDesktop()){
+        var open = el("button","chip","Open the coach"); open.type = "button";
+        open.onclick = function(){ closeWiz(); go("coach"); };
+        box.appendChild(open);
+      }
+
+      if(PL.consult){
+        box.appendChild(el("p","wiz-sub",
+          "I think the day is done. $250 a day is only eight days of a $2,000 drawdown — " +
+          "fewer if you've been in profit. Protect the capital. Define risk first, profit second.\n\n" +
+          "That's advice, not a wall. You can carry on if you've a reason to."));
+        box.appendChild(el("label", null, "What broke? One or two lines"));
+        var ta = el("textarea");
+        ta.placeholder = "The thesis was wrong / the stop was too tight / I took it early…";
+        ta.value = IT.postLossNote || "";
+        ta.oninput = function(){ IT.postLossNote = ta.value; };
+        box.appendChild(ta);
+      } else {
+        box.appendChild(el("label", null, "Anything you want to note before the next one? Optional"));
+        var t2 = el("textarea");
+        t2.placeholder = "What's different about this one…";
+        t2.value = IT.postLossNote || "";
+        t2.oninput = function(){ IT.postLossNote = t2.value; };
+        box.appendChild(t2);
+      }
+    },
+    ready: function(){
+      /* gentle on 1 and 2; the third asks for one honest sentence */
+      return PL.consult ? (IT.postLossNote || "").trim().length > 2 : true;
+    },
+    need: "One line on what broke — that's the whole point of stopping here"
+  };
+}
+
 function startInTrade(){
   if(liveTrade()){ toast("You're already in one — close it first"); return; }
 
@@ -3778,6 +4011,15 @@ function startInTrade(){
 
   var ideas = day().ideas || [];
   var steps = [];
+  /* first, before anything about the next trade — the consultation is
+     the point, and it stops being one if it comes after he has already
+     committed to an edge and a price */
+  var PL = postLossState();
+  if(PL){
+    IT.postLoss = PL;
+    steps.push(itStepPostLoss(PL));
+    postLossForceSplit();
+  }
   if(ideas.length) steps.push(itStepIdea(ideas));
   steps.push(itStepEdge(), itStepDir(),
              itStepPrice("entry","Where did you get filled?","The price you actually got, not the one you wanted.","Entry price"),
@@ -3789,7 +4031,11 @@ function startInTrade(){
   $("wiz").classList.add("on");
   document.body.style.overflow = "hidden";
   wizRender();
-  WIZ.onClose = function(){ IT = null; renderJournal(); renderLiveBar(); };
+  WIZ.onClose = function(){
+    IT = null;
+    applySplit();              /* undo any forced split — S.split was never written */
+    renderJournal(); renderLiveBar();
+  };
 }
 
 function itStepIdea(ideas){
@@ -3972,15 +4218,70 @@ function itStepSize(){
       if(v && v[IT.edge] && v[IT.edge].status === "caution"){
         box.appendChild(el("div","banner","Caution trade — minimum size."));
       }
+
+      /* after a loss the field arrives with a number in it and says why */
+      var PL = IT.postLoss, SZ = null;
+      if(PL){
+        SZ = postLossSize(PL, riskPtsNum(IT));
+        if(!IT.sizePrefilled){ IT.size = String(SZ.suggest); IT.sizePrefilled = true; }
+        var why = el("div","banner");
+        why.appendChild(el("div", null,
+          "Suggested " + SZ.suggest + (SZ.suggest === 1 ? " contract" : " contracts") +
+          " — you lost on " + (PL.lostSize || "?") + "."));
+        if(SZ.boundBy === "budget"){
+          why.appendChild(el("div", null,
+            "The table said " + SZ.table + ", but at " + money(SZ.perContract) +
+            " a contract that's all the budget left will carry."));
+        } else if(SZ.boundBy === "cap"){
+          why.appendChild(el("div", null,
+            "The table said " + SZ.table + "; the account's contract limit is " + SZ.cap + "."));
+        } else if(PL.lostSize >= 10){
+          why.appendChild(el("div", null,
+            "Ten or more contracts is where the size itself was the problem. Consolidate."));
+        }
+        if(SZ.underBudget){
+          why.appendChild(el("div", null,
+            "One contract at this stop is " + money(SZ.perContract) +
+            ", and there's less than that left of today's limit. " +
+            "The stop would take you through it. This is a stop-for-the-day, not a smaller trade."));
+        }
+        box.appendChild(why);
+      }
+
       box.appendChild(el("label", null, "Contracts"));
       var inp = el("input"); inp.type = "text"; inp.className = "price";
       inp.setAttribute("inputmode","numeric"); inp.placeholder = "1";
       inp.value = IT.size || "";
-      inp.oninput = function(){ IT.size = inp.value; };
       box.appendChild(inp);
+
+      /* Going above the suggestion is allowed and costs a sentence. The
+         field is built once and shown or hidden — re-rendering the step
+         on each keystroke would take the focus off the input mid-type. */
+      var wrap = el("div");
+      wrap.appendChild(el("label", null, "That's above the suggestion — why this size?"));
+      var rz = el("textarea");
+      rz.placeholder = "What the board can see that the table can't…";
+      rz.value = IT.sizeWhy || "";
+      rz.oninput = function(){ IT.sizeWhy = rz.value; };
+      wrap.appendChild(rz);
+      var sync = function(){
+        wrap.style.display =
+          (SZ && (parseInt(IT.size, 10) || 0) > SZ.suggest) ? "" : "none";
+      };
+      inp.oninput = function(){ IT.size = inp.value; sync(); };
+      if(SZ){ box.appendChild(wrap); sync(); }
+
       setTimeout(function(){ inp.focus(); }, 40);
     },
-    ready: function(){ return !!(IT.size || "").trim(); },
+    ready: function(){
+      if(!(IT.size || "").trim()) return false;
+      if(IT.postLoss){
+        var SZ = postLossSize(IT.postLoss, riskPtsNum(IT));
+        if((parseInt(IT.size, 10) || 0) > SZ.suggest)
+          return (IT.sizeWhy || "").trim().length > 2;
+      }
+      return true;
+    },
     need: "How many did you take?"
   };
 }
@@ -4037,6 +4338,11 @@ function itStepConfirm(){
         entry: IT.entry, stop: IT.stop, target: IT.target || "",
         plannedStop: IT.stop,
         mustHold: IT.mustHold, cautionWhy: IT.cautionWhy || "",
+        /* post-loss provenance — the weekly review reads these to show
+           what re-entries after a loss actually returned */
+        postLossN: IT.postLoss ? IT.postLoss.count : 0,
+        postLossNote: IT.postLossNote || "",
+        sizeWhy: IT.sizeWhy || "",
         exit:"", mae:"", result:"",
         tags: tagSnapshot(), status: st,
         live: true, checkins: [], review: null
