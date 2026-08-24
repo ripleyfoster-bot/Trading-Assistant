@@ -3402,6 +3402,10 @@ function renderJournal(){
   /* ---- the position you're actually in, first ---- */
   out.appendChild(liveCard());
 
+  /* ---- where the day stands after a loss ---- */
+  var plc = postLossCard();
+  if(plc) out.appendChild(plc);
+
   /* ---- observations ---- */
   var oc = el("div","card");
   oc.appendChild(el("h3", null, "Observations"));
@@ -3564,6 +3568,15 @@ function addTrade(){
   SHOTS.__trade = [];
   save(); renderJournal();
   toast("Logged. The four-minute review is where the value is.");
+
+  /* Logged after the fact, so there is no next-trade moment to catch.
+     The third loss interrupts here instead; one and two get the card. */
+  var t = d.trades[d.trades.length - 1];
+  var r = parseFloat(String(t.result).replace(/[^0-9.\-]/g, ""));
+  if(!isNaN(r) && r < 0){
+    var PL = postLossState();
+    if(PL && PL.consult && PL.last === t) openPostLossConsult(PL, t);
+  }
 }
 
 /* =====================================================================
@@ -3919,6 +3932,69 @@ function postLossForceSplit(){
   setTimeout(placeClocks, 30);
 }
 
+/* The arithmetic, in the plainest numbers available. Shared by the
+   wizard step, the Journal card and the log-a-trade consultation, so
+   the three can never drift apart. */
+function postLossLines(PL){
+  var b = dailyBudget();
+  var lostAmt = Math.abs(parseFloat(String(PL.last.result).replace(/[^0-9.\-]/g, "")) || 0);
+  var lines = [];
+  lines.push("Last trade: " + (PL.lostSize || "?") +
+    (PL.lostSize === 1 ? " contract" : " contracts") + " on " +
+    (PL.last.edge || "no edge") + ", " + money(lostAmt) + " gone.");
+  if(b){
+    lines.push(money(b.used) + " of your " + money(b.budget) +
+      " limit used. " + money(b.left) + " left on " + b.account.label + ".");
+    if(lostAmt > 0 && b.left > 0){
+      var more = Math.floor(b.left / lostAmt);
+      lines.push(more <= 0
+        ? "Another trade that size would take you past the limit."
+        : "That's " + more + " more trade" + (more === 1 ? "" : "s") +
+          " at the size that just lost.");
+    }
+  }
+  return lines;
+}
+
+/* `sink` is whatever holds the typed note — IT on the wizard path, the
+   trade record itself when logging after the fact. */
+function postLossPanel(PL, box, sink){
+  var p = el("div","banner");
+  postLossLines(PL).forEach(function(t){ p.appendChild(el("div", null, t)); });
+  box.appendChild(p);
+
+  var note = el("div","msg ai");
+  note.style.margin = "12px 0";
+  mdInto(note, postLossCanned(PL));
+  box.appendChild(note);
+  if(!sink.postLossAsked){
+    sink.postLossAsked = true;
+    postLossCoachAsk(PL, note);
+  }
+  if(!isDesktop()){
+    var open = el("button","chip","Open the coach"); open.type = "button";
+    open.onclick = function(){ closeWiz(); go("coach"); };
+    box.appendChild(open);
+  }
+
+  if(PL.consult){
+    box.appendChild(el("p","wiz-sub",
+      "I think the day is done. $250 a day is only eight days of a $2,000 drawdown — " +
+      "fewer if you've been in profit. Protect the capital. Define risk first, profit second.\n\n" +
+      "That's advice, not a wall. You can carry on if you've a reason to."));
+    box.appendChild(el("label", null, "What broke? One or two lines"));
+  } else {
+    box.appendChild(el("label", null, "Anything you want to note before the next one? Optional"));
+  }
+  var ta = el("textarea");
+  ta.placeholder = PL.consult
+    ? "The thesis was wrong / the stop was too tight / I took it early…"
+    : "What's different about this one…";
+  ta.value = sink.postLossNote || "";
+  ta.oninput = function(){ sink.postLossNote = ta.value; save(); };
+  box.appendChild(ta);
+}
+
 function itStepPostLoss(PL){
   return {
     say: PL.consult
@@ -3928,63 +4004,7 @@ function itStepPostLoss(PL){
       box.appendChild(el("h2","wiz-q", PL.consult
         ? "Three losses today"
         : (PL.count === 1 ? "That last one lost" : "Two losses now")));
-
-      /* the arithmetic, in the plainest numbers available */
-      var b = dailyBudget();
-      var lostAmt = Math.abs(parseFloat(String(PL.last.result).replace(/[^0-9.\-]/g, "")) || 0);
-      var lines = [];
-      lines.push("Last trade: " + (PL.lostSize || "?") +
-        (PL.lostSize === 1 ? " contract" : " contracts") + " on " +
-        (PL.last.edge || "no edge") + ", " + money(lostAmt) + " gone.");
-      if(b){
-        lines.push(money(b.used) + " of your " + money(b.budget) +
-          " limit used. " + money(b.left) + " left on " + b.account.label + ".");
-        if(lostAmt > 0 && b.left > 0){
-          var more = Math.floor(b.left / lostAmt);
-          lines.push(more <= 0
-            ? "Another trade that size would take you past the limit."
-            : "That's " + more + " more trade" + (more === 1 ? "" : "s") +
-              " at the size that just lost.");
-        }
-      }
-      var p = el("div","banner");
-      lines.forEach(function(t){ p.appendChild(el("div", null, t)); });
-      box.appendChild(p);
-
-      /* the coach — canned now, real note when it lands */
-      var note = el("div","msg ai");
-      note.style.margin = "12px 0";
-      mdInto(note, postLossCanned(PL));
-      box.appendChild(note);
-      if(!IT.postLossAsked){
-        IT.postLossAsked = true;
-        postLossCoachAsk(PL, note);
-      }
-      if(!isDesktop()){
-        var open = el("button","chip","Open the coach"); open.type = "button";
-        open.onclick = function(){ closeWiz(); go("coach"); };
-        box.appendChild(open);
-      }
-
-      if(PL.consult){
-        box.appendChild(el("p","wiz-sub",
-          "I think the day is done. $250 a day is only eight days of a $2,000 drawdown — " +
-          "fewer if you've been in profit. Protect the capital. Define risk first, profit second.\n\n" +
-          "That's advice, not a wall. You can carry on if you've a reason to."));
-        box.appendChild(el("label", null, "What broke? One or two lines"));
-        var ta = el("textarea");
-        ta.placeholder = "The thesis was wrong / the stop was too tight / I took it early…";
-        ta.value = IT.postLossNote || "";
-        ta.oninput = function(){ IT.postLossNote = ta.value; };
-        box.appendChild(ta);
-      } else {
-        box.appendChild(el("label", null, "Anything you want to note before the next one? Optional"));
-        var t2 = el("textarea");
-        t2.placeholder = "What's different about this one…";
-        t2.value = IT.postLossNote || "";
-        t2.oninput = function(){ IT.postLossNote = t2.value; };
-        box.appendChild(t2);
-      }
+      postLossPanel(PL, box, IT);
     },
     ready: function(){
       /* gentle on 1 and 2; the third asks for one honest sentence */
@@ -3992,6 +4012,63 @@ function itStepPostLoss(PL){
     },
     need: "One line on what broke — that's the whole point of stopping here"
   };
+}
+
+/* Logging a trade after the fact has no "before the next trade" moment,
+   so the third loss interrupts here instead. Losses 1 and 2 get the
+   Journal card only — a modal between each of three trades logged in an
+   end-of-day catch-up would be noise about trades long finished. */
+function openPostLossConsult(PL, trade){
+  WIZ.steps = [{
+    say: "That's " + PL.count + " losses today. Let's stop and look at this properly.",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q", PL.count + " losses today"));
+      postLossPanel(PL, box, trade);
+    },
+    ready: function(){ return (trade.postLossNote || "").trim().length > 2; },
+    need: "One line on what broke — that's the whole point of stopping here"
+  }];
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  postLossForceSplit();
+  wizRender();
+  WIZ.onClose = function(){ save(); applySplit(); renderJournal(); };
+}
+
+/* Always on the Journal page once there's a loss today. Never
+   interrupts — this is the path for logging as you go and for catching
+   up at the end, and it has to be honest in both. */
+function postLossCard(){
+  var PL = postLossState();
+  if(!PL) return null;
+  var c = el("div","card");
+  c.appendChild(el("h3", null, PL.count === 1
+    ? "One loss today" : PL.count + " losses today"));
+  c.appendChild(el("p","hint","Where the day actually stands before the next one."));
+  var p = el("div","banner");
+  postLossLines(PL).forEach(function(t){ p.appendChild(el("div", null, t)); });
+  c.appendChild(p);
+
+  var pts = riskPtsNum(PL.last);
+  var SZ = postLossSize(PL, pts);
+  c.appendChild(el("p","hint", "If you take another, the suggestion is " +
+    SZ.suggest + (SZ.suggest === 1 ? " contract" : " contracts") +
+    " — you lost on " + (PL.lostSize || "?") + "." +
+    (SZ.boundBy === "budget"
+      ? " The table said " + SZ.table + "; that's all the budget left will carry."
+      : SZ.boundBy === "cap"
+        ? " The table said " + SZ.table + "; the account's contract limit is " + SZ.cap + "."
+        : "")));
+
+  if(PL.consult){
+    c.appendChild(el("p","rev-todo",
+      "I think the day is done. Advice, not a wall."));
+  }
+  var talk = el("button","chip","Talk it through with the coach"); talk.type = "button";
+  talk.onclick = function(){ go("coach"); };
+  c.appendChild(talk);
+  return c;
 }
 
 function startInTrade(){
