@@ -235,7 +235,7 @@ nav .ico{font-size:17px;line-height:1}
 
 .toast{
   position:fixed;left:50%;transform:translateX(-50%);
-  bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;
+  bottom:calc(84px + env(safe-area-inset-bottom));z-index:300;
   background:var(--ink);color:var(--bg);padding:10px 15px;
   border-radius:999px;font-size:13.5px;max-width:88%;text-align:center;
   opacity:0;pointer-events:none;transition:opacity .18s;
@@ -994,7 +994,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "5.1";
+var APP_VERSION = "5.2";
 var KEY = "ta_wpa_1";
 var S = load();
 
