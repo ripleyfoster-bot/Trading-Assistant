@@ -994,7 +994,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "5.2";
+var APP_VERSION = "5.3";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -2491,15 +2491,59 @@ $("impData").onchange = function(){
       $("dataOut").textContent = "That doesn't look like a Trading Assistant export.";
       return;
     }
-    var mine = Object.keys(S.days).length, theirs = Object.keys(inc.days).length;
-    var merge = confirm(
-      "Import " + theirs + " day(s)?\n\nOK = merge into this device (the file wins where the same day exists on both).\nCancel = stop, import nothing."
-    );
-    if(!merge) return;
-    Object.keys(inc.days).forEach(function(k){ S.days[k] = inc.days[k]; });
-    ["mode","accent","pmStart","openTime"].forEach(function(k){ if(inc[k]) S[k] = inc[k]; });
+    var done = [];
+
+    /* --- Days. Merge, file wins on a clash. Asked on its own. --- */
+    var theirs = Object.keys(inc.days).length;
+    if(theirs > 0 && confirm(
+      "Import " + theirs + " day(s)?\n\nOK = merge into this device (the file wins where the same day exists on both).\nCancel = leave this device's days alone."
+    )){
+      Object.keys(inc.days).forEach(function(k){ S.days[k] = inc.days[k]; });
+      ["mode","accent","pmStart","openTime"].forEach(function(k){ if(inc[k]) S[k] = inc[k]; });
+      done.push(Object.keys(S.days).length + " day(s) now on this device");
+    }
+
+    /* --- Risk tab. firms, accounts and risk move as one bundle or not
+       at all: groupLead lives in risk and names an account id, so a
+       partial import leaves the tab pointing at nothing. Replace, never
+       merge — merging by id would duplicate every account. --- */
+    var incFirms = Array.isArray(inc.firms) ? inc.firms : [];
+    var incAccts = Array.isArray(inc.accounts) ? inc.accounts : [];
+    if(incFirms.length || incAccts.length){
+      var names = incAccts.map(function(a){
+        return "  \u2022 " + (a.label || a.acctNo || "Unnamed account");
+      });
+      var shown = names.slice(0, 8).join("\n");
+      if(names.length > 8) shown += "\n  \u2022 \u2026and " + (names.length - 8) + " more";
+      if(!names.length) shown = "  (no accounts in this file)";
+
+      if(confirm(
+        "This file holds " + incAccts.length + " account(s) and " +
+        incFirms.length + " firm(s):\n\n" + shown +
+        "\n\nOK = replace the Risk tab on this device with these, including your risk settings.\nCancel = leave the Risk tab alone."
+      )){
+        S.firms    = JSON.parse(JSON.stringify(incFirms));
+        S.accounts = JSON.parse(JSON.stringify(incAccts));
+        if(inc.risk && typeof inc.risk === "object"){
+          S.risk = JSON.parse(JSON.stringify(inc.risk));
+        }
+        /* A lead naming an account that did not come with it renders as
+           an empty tab with no explanation. Clear it and let the tab ask. */
+        var lead = (S.risk || {}).groupLead;
+        if(lead && !accounts().some(function(a){ return a.id === lead; })){
+          S.risk.groupLead = "";
+          done.push("lead account cleared \u2014 pick one on the Risk tab");
+        }
+        done.push(incAccts.length + " account(s) and " + incFirms.length + " firm(s)");
+      }
+    }
+
+    if(!done.length){
+      $("dataOut").textContent = "Nothing imported. This device is unchanged.";
+      return;
+    }
     save(); renderAll();
-    $("dataOut").textContent = "Imported. This device now holds " + Object.keys(S.days).length + " day(s). Your API key was untouched.";
+    $("dataOut").textContent = "Imported: " + done.join("; ") + ". Your API key was untouched.";
   };
   r.readAsText(f);
 };
