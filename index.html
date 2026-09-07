@@ -470,6 +470,8 @@ nav .ico{font-size:17px;line-height:1}
 
 
 /* ---- coach panel switch, sidebar only ---- */
+.rev-table{margin-top:10px}
+.rev-table p{line-height:1.45}
 .nav-split{display:none}
 @media(min-width:1000px){
   .nav-split{
@@ -852,6 +854,13 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <div id="journalOut"></div>
 </section>
 
+<!-- ============================ REVIEW ============================ -->
+<section class="view" id="v-review">
+  <h2>Weekly review</h2>
+  <p class="sub" id="reviewSub">What the week actually returned, edge by edge.</p>
+  <div id="reviewOut"></div>
+</section>
+
 <!-- ============================ RISK ============================ -->
 <section class="view" id="v-risk">
   <h2>Accounts &amp; risk</h2>
@@ -975,6 +984,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <button data-go="board"><span class="ico">▤</span>Board<span class="dot"></span></button>
   <button data-go="plan"><span class="ico">◎</span>Ideas<span class="dot"></span></button>
   <button data-go="journal"><span class="ico">✎</span>Journal<span class="dot"></span></button>
+  <button data-go="review"><span class="ico">◷</span>Review<span class="dot"></span></button>
   <button data-go="risk"><span class="ico">◈</span>Risk<span class="dot"></span></button>
   <button data-go="set"><span class="ico">⚙</span>Settings<span class="dot"></span></button>
   <div class="nav-split" id="navSplit">
@@ -994,7 +1004,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "5.3";
+var APP_VERSION = "5.4";
 var KEY = "ta_wpa_1";
 var S = load();
 
@@ -1018,6 +1028,11 @@ function migrate(s){
   if(s.ciEvery === undefined) s.ciEvery = 15;
   s.apiKey = s.apiKey || "";
   s.days = s.days || {};
+  /* v5.4 weekly review. weeks is keyed by the Monday, YYYY-MM-DD.
+     testDays marks a day key as not-real so the KPIs skip it — the
+     trades stay in storage, they just stop counting. */
+  s.weeks = s.weeks || {};
+  s.testDays = s.testDays || {};
   return s;
 }
 function save(){
@@ -1899,6 +1914,22 @@ function renderBoard(){
   var out = $("boardOut"); out.innerHTML = "";
   var sub = $("boardSub");
 
+  var wk = weeklyOutstanding();
+  if(wk){
+    sub.textContent = "Locked until last week is reviewed.";
+    var ew = el("div","empty");
+    ew.appendChild(el("strong", null, "Review " + weekLabel(wk)));
+    ew.appendChild(el("span", null,
+      "The board stays shut until the week is reviewed. It's in the Review tab."));
+    var bw = el("button","cap-btn"); bw.type = "button";
+    bw.style.marginTop = "10px";
+    bw.textContent = "Go to the review";
+    bw.onclick = function(){ go("review"); };
+    ew.appendChild(bw);
+    out.appendChild(ew);
+    return;
+  }
+
   var pending = reviewOutstanding();
   if(pending){
     sub.textContent = "Locked until the last day is closed out.";
@@ -2318,13 +2349,14 @@ function go(name){
   }
   if(isDesktop()) document.body.classList.remove("coach-full");
   CURRENT = name;
-  ["prep","board","plan","journal","risk","coach","set"].forEach(function(v){
+  ["prep","board","plan","journal","review","risk","coach","set"].forEach(function(v){
     $("v-" + v).classList.toggle("on", v === name);
   });
   syncNav(name);
   if(name === "board") renderBoard();
   if(name === "plan"){ renderIdeaEdges(); renderIdeas(); }
   if(name === "journal") renderJournal();
+  if(name === "review") renderReview();
   if(name === "risk") renderRisk();
   if(name === "coach") renderCoach();
   window.scrollTo(0,0);
@@ -2954,6 +2986,11 @@ function wizBack(){
 }
 
 $("startWiz").onclick = function(){
+  var wkOut = weeklyOutstanding();
+  if(wkOut){
+    toast("Review " + weekLabel(wkOut) + " first \u2014 it's in the Review tab");
+    go("review"); return;
+  }
   if(reviewOutstanding()){
     toast("Close out the last day first — it's in the Journal");
     go("journal"); return;
@@ -3019,7 +3056,7 @@ var APP_BRIEF =
   "Reporting figures back is different and is fine: numbers he has entered, and numbers the app has calculated and handed you in today's context, you may repeat and discuss freely. " +
   "The line is between reading his figures back and originating one. " +
 
-  "LAYOUT. Seven tabs along the bottom, left to right: Prep, Board, Ideas, Journal, Risk, Settings, Coach. On a wide screen the coach can sit beside the rest as a panel. " +
+  "LAYOUT. Eight tabs along the bottom, left to right: Prep, Board, Ideas, Journal, Review, Risk, Settings, Coach. Review holds the Monday-to-Friday weekly KPI review: win rate, average and largest win and loss, expectancy in dollars and in R, a split by edge and by the edge verdict at entry, post-loss re-entries, six written questions, and a per-day flag that excludes a day as test data. An unreviewed finished week keeps the board shut. On a wide screen the coach can sit beside the rest as a panel. " +
 
   "PREP — 'Plan of attack'. Six numbered steps in fixed order, observe first and interpret after. " +
   "There is a 'Start guided prep' button at the top that walks the same ground one question per screen, and that is the way it is meant to be done. " +
@@ -3210,7 +3247,8 @@ function renderCoach(){
    the coach is told that instead and "why does this matter?" lands. */
 function whereNow(){
   var w = { prep:"the prep screen", board:"the edge board", plan:"his trade ideas",
-            journal:"the journal", risk:"accounts and risk", coach:"the coach",
+            journal:"the journal", review:"the weekly review",
+            risk:"accounts and risk", coach:"the coach",
             set:"settings" }[CURRENT] || "the app";
   var wiz = $("wiz");
   if(wiz && wiz.classList.contains("on") && WIZ.steps && WIZ.steps.length){
@@ -6686,6 +6724,417 @@ function stageShot(key, dataUrl, type, refresh){
   });
 }
 
+
+/* =====================================================================
+   WEEKLY REVIEW  (v5.4)
+   Reads what is already logged. It never originates a figure: every
+   number here is derived from trades you entered, and a day you mark as
+   test data stops counting without being deleted.
+   Week runs Monday to Friday. Keyed by the Monday, YYYY-MM-DD.
+===================================================================== */
+
+function mondayOf(key){
+  var p = String(key).split("-");
+  var d = new Date(+p[0], +p[1] - 1, +p[2]);
+  var g = d.getDay();                       /* 0 Sun … 6 Sat */
+  d.setDate(d.getDate() - (g === 0 ? 6 : g - 1));
+  return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+}
+function weekDayKeys(mon){
+  var p = String(mon).split("-"), out = [];
+  for(var i = 0; i < 5; i++){
+    var d = new Date(+p[0], +p[1] - 1, +p[2] + i);
+    out.push(d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()));
+  }
+  return out;
+}
+function shiftWeek(mon, weeks){
+  var p = String(mon).split("-");
+  var d = new Date(+p[0], +p[1] - 1, +p[2] + weeks * 7);
+  return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+}
+function weekLabel(mon){
+  var p = String(mon).split("-");
+  var a = new Date(+p[0], +p[1] - 1, +p[2]);
+  var b = new Date(+p[0], +p[1] - 1, +p[2] + 4);
+  var f = function(d){
+    return new Intl.DateTimeFormat("en-GB",{day:"numeric",month:"short"}).format(d);
+  };
+  return "w/c " + f(a) + " – " + f(b);
+}
+function num(v){
+  var n = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+  return isNaN(n) ? null : n;
+}
+function money(n){ return (n >= 0 ? "+" : "\u2212") + "$" + Math.abs(n).toFixed(2); }
+
+/* A Saturday or Sunday record must not create a week. The week is
+   Monday to Friday, so weekend days are invisible to weekStats() — and
+   counting them here would shut the board over a review with nothing
+   in it. Your 29 Aug 2026 record is a Saturday; this is not theoretical. */
+function isWeekday(key){
+  var p = String(key).split("-");
+  var g = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
+  return g >= 1 && g <= 5;
+}
+
+/* Every week key that has anything in it, newest first. */
+function weeksWithData(){
+  var seen = {};
+  Object.keys(S.days).forEach(function(k){
+    if(!isWeekday(k)) return;
+    var d = S.days[k];
+    var used = (d.trades || []).length || (d.ideas || []).length ||
+               Object.keys(d.facts || {}).length || (d.eod ? 1 : 0);
+    if(used) seen[mondayOf(k)] = true;
+  });
+  return Object.keys(seen).sort().reverse();
+}
+
+/* The one week that holds the board shut: the most recent finished week
+   that has data and no review. Never this week — you cannot review a
+   week you are still trading. Never anything if there is no such week,
+   which is what stops a brand new install locking you out on day one. */
+function weeklyOutstanding(){
+  var thisMon = mondayOf(todayKey());
+  var all = weeksWithData();
+  for(var i = 0; i < all.length; i++){
+    if(all[i] >= thisMon) continue;
+    if((S.weeks[all[i]] || {}).done) continue;
+    return all[i];
+  }
+  return null;
+}
+
+function weekStats(mon){
+  var tick = +((S.risk || {}).tickValue) || 5;
+  var st = {
+    mon: mon, days: [], n: 0, wins: 0, losses: 0, flat: 0,
+    sum: 0, grossWin: 0, grossLoss: 0, noResult: 0, excluded: 0,
+    bigWin: null, bigLoss: null, rSum: 0, rCount: 0,
+    edges: {}, envs: {}, plN: 0, plSum: 0, tradeDays: 0
+  };
+  var bucket = function(map, key){
+    if(!map[key]) map[key] = { n:0, wins:0, sum:0, rSum:0, rCount:0 };
+    return map[key];
+  };
+
+  weekDayKeys(mon).forEach(function(k){
+    var d = S.days[k];
+    if(!d) return;
+    var test = !!S.testDays[k];
+    var closed = (d.trades || []).filter(function(t){ return !t.live; });
+    st.days.push({
+      key: k, test: test, count: closed.length,
+      eod: !!(d.eod && (d.eod.done || d.eod.skipped))
+    });
+    if(test){ st.excluded += closed.length; return; }
+    if(closed.length) st.tradeDays++;
+
+    closed.forEach(function(t){
+      var r = num(t.result);
+      if(r === null){ st.noResult++; return; }
+      st.n++; st.sum += r;
+      if(r > 0){ st.wins++; st.grossWin += r; }
+      else if(r < 0){ st.losses++; st.grossLoss += -r; }
+      else st.flat++;
+      if(st.bigWin  === null || r > st.bigWin)  st.bigWin  = r;
+      if(st.bigLoss === null || r < st.bigLoss) st.bigLoss = r;
+
+      /* R needs the stop you planned, not where you actually got out. */
+      var e = num(t.entry), sp = num(t.plannedStop || t.stop);
+      var size = num(t.size) || 1;
+      var riskD = (e === null || sp === null) ? 0 : Math.abs(e - sp) * tick * size;
+      var rr = riskD > 0 ? r / riskD : null;
+      if(rr !== null){ st.rSum += rr; st.rCount++; }
+
+      var eb = bucket(st.edges, t.edge || "unknown");
+      eb.n++; eb.sum += r; if(r > 0) eb.wins++;
+      if(rr !== null){ eb.rSum += rr; eb.rCount++; }
+
+      var env = t.status || "n/a";
+      var vb = bucket(st.envs, env);
+      vb.n++; vb.sum += r; if(r > 0) vb.wins++;
+      if(rr !== null){ vb.rSum += rr; vb.rCount++; }
+
+      if(+t.postLossN > 0){ st.plN++; st.plSum += r; }
+    });
+  });
+  return st;
+}
+
+function edgeName(id){
+  for(var i = 0; i < EDGES.length; i++) if(EDGES[i].id === id) return EDGES[i].name;
+  return id === "unknown" ? "Not recorded" : id;
+}
+function envName(v){
+  return v === "on" ? "ON" : v === "caution" ? "CAUTION"
+       : v === "off" ? "OFF" : "Not recorded";
+}
+
+/* ---- the read-out, shared by the page and the wizard ---- */
+function statTable(rows){
+  var w = el("div","rev-table");
+  rows.forEach(function(r){
+    var line = el("p","hint"); line.style.margin = "5px 0";
+    line.appendChild(el("b", null, r[0] + ": "));
+    line.appendChild(document.createTextNode(r[1]));
+    w.appendChild(line);
+  });
+  return w;
+}
+function headlineRows(st){
+  if(!st.n) return [["Trades with a result", "none"]];
+  var wr = Math.round(st.wins / st.n * 100);
+  var avgW = st.wins ? st.grossWin / st.wins : 0;
+  var avgL = st.losses ? st.grossLoss / st.losses : 0;
+  var rows = [
+    ["Trades", st.n + " across " + st.tradeDays + " day(s)"],
+    ["Win rate", wr + "% (" + st.wins + " green, " + st.losses + " red" +
+      (st.flat ? ", " + st.flat + " flat" : "") + ")"],
+    ["Net", money(st.sum)],
+    ["Average win", avgW ? money(avgW) : "\u2014"],
+    ["Average loss", avgL ? money(-avgL) : "\u2014"],
+    ["Largest win", st.bigWin === null ? "\u2014" : money(st.bigWin)],
+    ["Largest loss", st.bigLoss === null ? "\u2014" : money(st.bigLoss)],
+    ["Expectancy per trade", money(st.sum / st.n)]
+  ];
+  rows.push(["Expectancy in R", st.rCount
+    ? (st.rSum / st.rCount >= 0 ? "+" : "\u2212") +
+      Math.abs(st.rSum / st.rCount).toFixed(2) + "R over " + st.rCount + " trade(s)"
+    : "no planned stops recorded"]);
+  if(st.noResult) rows.push(["Left out", st.noResult + " trade(s) with no result typed in"]);
+  if(st.excluded) rows.push(["Excluded as test data", st.excluded + " trade(s)"]);
+  return rows;
+}
+function bucketRows(map, namer){
+  var keys = Object.keys(map);
+  if(!keys.length) return [["Nothing to split", "no trades with results"]];
+  keys.sort(function(a,b){ return map[b].sum - map[a].sum; });
+  return keys.map(function(k){
+    var b = map[k];
+    var r = b.rCount ? ((b.rSum / b.rCount >= 0 ? "+" : "\u2212") +
+      Math.abs(b.rSum / b.rCount).toFixed(2) + "R") : "no R";
+    return [namer(k), b.n + " trade(s) \u00b7 " + Math.round(b.wins / b.n * 100) +
+      "% \u00b7 " + money(b.sum) + " \u00b7 " + r + " avg"];
+  });
+}
+
+/* ---- the six written questions ---- */
+var WEEK_QS = [
+  { id:"numbers",  q:"What do the numbers say that you didn't feel at the time?",
+    sub:"Start from the read-out, not from memory. The gap between the two is the point of doing this." },
+  { id:"edges",    q:"Which edge earned its place this week, and which didn't?",
+    sub:"Name them. One week is a small sample \u2014 say so if it's too thin to call." },
+  { id:"deviation",q:"Where did you deviate from the plan, and what did it cost?",
+    sub:"Size, entry, stop moved, held past the level, traded an edge that was OFF." },
+  { id:"caution",  q:"What did your CAUTION trades and post-loss re-entries actually return?",
+    sub:"The read-out has the figures. This is what you make of them." },
+  { id:"change",   q:"One process change for next week.",
+    sub:"Something you can do or not do, not an outcome you'd like." },
+  { id:"refuse",   q:"One thing you will refuse to do next week.",
+    sub:"A line you won't cross. Short is better." }
+];
+
+function openWeekly(mon){
+  var st = weekStats(mon);
+  var rec = S.weeks[mon] || { answers:{}, done:false };
+  S.weeks[mon] = rec;
+  rec.answers = rec.answers || {};
+  var thin = st.n === 0;                    /* the short version */
+
+  var steps = [];
+
+  steps.push({
+    say: "Here is the week. " + (thin
+      ? "No trades with results, so this is the short version."
+      : st.n + " trades, net " + money(st.sum) + "."),
+    render: function(box){
+      box.appendChild(el("h2","wiz-q", weekLabel(mon)));
+      box.appendChild(el("p","wiz-sub", thin
+        ? "No trades carried a result this week. The numbers are skipped \u2014 the questions still matter."
+        : "Read it before you write anything. These are your figures, not the coach's."));
+      box.appendChild(statTable(headlineRows(st)));
+      if(st.excluded){
+        box.appendChild(el("div","rev-todo",
+          st.excluded + " trade(s) excluded because you marked their day as test data."));
+      }
+    },
+    ready: function(){ return true; }
+  });
+
+  if(!thin){
+    steps.push({
+      say: "By edge.",
+      render: function(box){
+        box.appendChild(el("h2","wiz-q","By edge"));
+        box.appendChild(el("p","wiz-sub",
+          "Trades, win rate, net, and average R. R compares edges fairly when the stops differ."));
+        box.appendChild(statTable(bucketRows(st.edges, edgeName)));
+      },
+      ready: function(){ return true; }
+    });
+    steps.push({
+      say: "By environment.",
+      render: function(box){
+        box.appendChild(el("h2","wiz-q","By environment"));
+        box.appendChild(el("p","wiz-sub",
+          "The edge's verdict at the moment you entered \u2014 what the board said, not what happened after."));
+        box.appendChild(statTable(bucketRows(st.envs, envName)));
+        var rows = [];
+        rows.push(["Post-loss re-entries", st.plN
+          ? st.plN + " trade(s) \u00b7 " + money(st.plSum)
+          : "none this week"]);
+        box.appendChild(statTable(rows));
+      },
+      ready: function(){ return true; }
+    });
+  }
+
+  WEEK_QS.forEach(function(q){
+    steps.push({
+      say: q.q,
+      render: function(box){
+        box.appendChild(el("h2","wiz-q", q.q));
+        box.appendChild(el("p","wiz-sub", q.sub));
+        var ta = el("textarea");
+        ta.placeholder = "Your answer";
+        ta.value = rec.answers[q.id] || "";
+        ta.oninput = function(){ rec.answers[q.id] = ta.value; save(); };
+        box.appendChild(ta);
+      },
+      ready: function(){ return (rec.answers[q.id] || "").trim().length > 2; },
+      need: "Write something \u2014 a short honest line beats a blank"
+    });
+  });
+
+  steps.push({
+    say: "Lock the week in and the board opens.",
+    render: function(box){
+      box.appendChild(el("h2","wiz-q","Close the week"));
+      box.appendChild(el("p","wiz-sub",
+        "This is what the execution scorecard will read later. You can reopen and edit it."));
+      box.appendChild(statTable(headlineRows(st)));
+      var b = el("button","btn wide"); b.type = "button";
+      b.textContent = rec.done ? "Saved \u2014 close" : "Lock the week in";
+      b.style.marginTop = "12px";
+      b.onclick = function(){
+        rec.done = true;
+        rec.at = new Date().toISOString();
+        /* a snapshot so the scorecard reads the week as it stood, even
+           if a day is edited or flagged afterwards */
+        rec.stats = {
+          n: st.n, wins: st.wins, losses: st.losses, sum: st.sum,
+          rAvg: st.rCount ? st.rSum / st.rCount : null,
+          excluded: st.excluded, tradeDays: st.tradeDays
+        };
+        save(); closeWiz(); toast("Week closed");
+      };
+      box.appendChild(b);
+    },
+    ready: function(){ return true; }
+  });
+
+  WIZ.steps = steps;
+  WIZ.i = 0;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+  WIZ.onClose = function(){ save(); renderReview(); renderBoard(); };
+}
+
+function renderReview(){
+  var out = $("reviewOut"); if(!out) return;
+  out.innerHTML = "";
+  var sub = $("reviewSub");
+
+  var weeks = weeksWithData();
+  if(!weeks.length){
+    sub.textContent = "Nothing to review yet.";
+    var e0 = el("div","empty");
+    e0.appendChild(el("strong", null, "No weeks with anything in them"));
+    e0.appendChild(el("span", null,
+      "Once you've prepped or traded a day, that week shows up here on the Monday after."));
+    out.appendChild(e0);
+    return;
+  }
+
+  var pending = weeklyOutstanding();
+  sub.textContent = pending
+    ? "The board stays shut until " + weekLabel(pending) + " is reviewed."
+    : "Every finished week is reviewed.";
+
+  weeks.slice(0, 8).forEach(function(mon){
+    var st = weekStats(mon);
+    var rec = S.weeks[mon] || {};
+    var thisWeek = mon >= mondayOf(todayKey());
+
+    var c = el("div","card");
+    var h = el("h3", null, weekLabel(mon));
+    c.appendChild(h);
+
+    var line = el("p","hint");
+    line.textContent = thisWeek
+      ? "Still running \u2014 reviewable from Monday."
+      : (st.n ? st.n + " trade(s) \u00b7 " + money(st.sum) : "no trades with results");
+    c.appendChild(line);
+
+    if(rec.done) c.appendChild(el("div","eod-done","Reviewed."));
+    else if(!thisWeek && mon === pending)
+      c.appendChild(el("div","rev-todo","This one is holding the board shut."));
+
+    /* per-day test-data flags. This is the only place in the app that
+       reaches a past day, so it doubles as the way to disown a day of
+       trades without deleting them. */
+    if(st.days.length){
+      var det = el("details");
+      det.appendChild(el("summary", null, "Days in this week"));
+      st.days.forEach(function(dd){
+        var row = el("div","prop-item");
+        var cb = el("input"); cb.type = "checkbox";
+        cb.id = "tw-" + dd.key;
+        cb.checked = dd.test;
+        cb.onchange = function(){
+          if(cb.checked) S.testDays[dd.key] = true;
+          else delete S.testDays[dd.key];
+          save(); renderReview();
+        };
+        var lab = el("label", null,
+          dd.key + " \u2014 " + dd.count + " trade(s)" +
+          (dd.eod ? "" : ", not closed out") + "  \u00b7  exclude as test data");
+        lab.setAttribute("for", cb.id);
+        row.appendChild(cb); row.appendChild(lab);
+        det.appendChild(row);
+      });
+      c.appendChild(det);
+    }
+
+    if(!thisWeek){
+      var b = el("button","cap-btn"); b.type = "button";
+      b.style.marginTop = "10px";
+      b.textContent = rec.done ? "Reopen the review" : "Start the review";
+      b.onclick = function(){ openWeekly(mon); };
+      c.appendChild(b);
+    }
+
+    if(rec.done && rec.answers){
+      var d2 = el("details");
+      d2.appendChild(el("summary", null, "What you wrote"));
+      WEEK_QS.forEach(function(q){
+        var a = rec.answers[q.id];
+        if(!a) return;
+        var p2 = el("p","hint"); p2.style.margin = "6px 0";
+        p2.appendChild(el("b", null, q.q + " "));
+        p2.appendChild(document.createTextNode(a));
+        d2.appendChild(p2);
+      });
+      c.appendChild(d2);
+    }
+
+    out.appendChild(c);
+  });
+}
+
 function renderAll(){
   day();
   applyTheme(); applySide(); renderNavSplit(); buildClocks(); dstCheck(); renderHeader();
@@ -6696,7 +7145,8 @@ function renderAll(){
   safely("settings", renderSettings);
   safely("board", renderBoard); safely("ideaEdges", renderIdeaEdges);
   safely("ideas", renderIdeas); safely("prepLock", renderPrepLock);
-  safely("journal", renderJournal); safely("risk", renderRisk);
+  safely("journal", renderJournal); safely("review", renderReview);
+  safely("risk", renderRisk);
   safely("coach", renderCoach); safely("nudge", ruleStaleNudge);
   safely("liveBar", renderLiveBar);
   tickClocks(); measureHeader(); placeClocks();
