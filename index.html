@@ -219,7 +219,7 @@ input[type=text].price{font-family:var(--f-data)}
 /* tab bar */
 nav{
   position:fixed;left:0;right:0;bottom:0;z-index:40;
-  display:grid;grid-template-columns:repeat(7,1fr);
+  display:grid;grid-template-columns:repeat(8,1fr);
   background:var(--card);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom);
 }
@@ -227,6 +227,7 @@ nav button{
   background:none;border:0;padding:9px 4px 10px;cursor:pointer;
   color:var(--ink-3);font-size:11px;font-weight:560;
   display:flex;flex-direction:column;align-items:center;gap:3px;
+  min-width:0;white-space:nowrap;
 }
 nav button .dot{width:5px;height:5px;border-radius:50%;background:transparent}
 nav button[aria-current="page"]{color:var(--acc)}
@@ -615,7 +616,7 @@ nav .ico{font-size:17px;line-height:1}
   border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;margin-top:10px;line-height:1.4;
 }
 @media(max-width:620px){
-  nav button{font-size:10px}
+  nav button{font-size:9px;padding:8px 2px 9px;letter-spacing:-0.2px}
   nav .ico{font-size:15px}
 }
 
@@ -1004,7 +1005,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "5.4";
+var APP_VERSION = "5.5";
 var KEY = "ta_wpa_1";
 var S = load();
 
