@@ -219,7 +219,7 @@ input[type=text].price{font-family:var(--f-data)}
 /* tab bar */
 nav{
   position:fixed;left:0;right:0;bottom:0;z-index:40;
-  display:grid;grid-template-columns:repeat(8,1fr);
+  display:grid;grid-template-columns:repeat(9,1fr);
   background:var(--card);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom);
 }
@@ -616,10 +616,61 @@ nav .ico{font-size:17px;line-height:1}
   border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;margin-top:10px;line-height:1.4;
 }
 @media(max-width:620px){
-  nav button{font-size:9px;padding:8px 2px 9px;letter-spacing:-0.2px}
-  nav .ico{font-size:15px}
+  /* v5.8 nine columns instead of eight — the labels need the headroom */
+  nav button{font-size:8.5px;padding:8px 1px 9px;letter-spacing:-0.3px}
+  nav .ico{font-size:14px}
 }
 
+
+
+/* ---- teaching mode (v5.8) ---- */
+.lsn-kicker{
+  font-size:10.5px;font-weight:640;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 10px;
+}
+.lsn p{font-size:15px;line-height:1.55;color:var(--ink);margin:0 0 13px}
+.lsn ul,.lsn ol{margin:0 0 14px;padding-left:20px}
+.lsn li{font-size:15px;line-height:1.5;color:var(--ink);margin-bottom:7px}
+.lsn b{font-weight:640}
+.lsn-box{
+  border:1px solid var(--line);background:var(--card-2);
+  border-radius:var(--radius-sm);padding:12px 13px;margin:0 0 14px;
+}
+.lsn-box h4{
+  margin:0 0 7px;font-size:11px;font-weight:640;letter-spacing:.7px;
+  text-transform:uppercase;color:var(--ink-3);
+}
+.lsn-box p{font-size:14.5px;margin:0 0 8px}
+.lsn-box p:last-child{margin-bottom:0}
+.lsn-box.acc{border-color:var(--acc);background:var(--acc-soft)}
+.lsn-box.off{border-color:var(--off-line);background:var(--off-bg)}
+.lsn-box.off h4{color:var(--off)}
+.lsn-box.caution{border-color:var(--caution-line);background:var(--caution-bg)}
+.lsn-box.caution h4{color:var(--caution)}
+.lsn-box.ok{border-color:var(--ok-line);background:var(--ok-bg)}
+.lsn-box.ok h4{color:var(--ok)}
+.lsn-dt{margin:0 0 11px}
+.lsn-dt .k{
+  display:block;font-size:10.5px;font-weight:640;letter-spacing:.7px;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:3px;
+}
+.lsn-dt .v{display:block;font-size:15px;line-height:1.5;color:var(--ink)}
+.lsn-note{
+  font-size:13.5px;line-height:1.5;color:var(--ink-2);
+  border-left:2px solid var(--line);padding-left:11px;margin:0 0 14px;
+}
+.lsn-flag{
+  font-size:13px;line-height:1.5;
+  border:1px dashed var(--caution-line);background:var(--caution-bg);color:var(--caution);
+  border-radius:var(--radius-sm);padding:10px 12px;margin:0 0 14px;
+}
+.lsn-card .hint{margin-bottom:8px}
+.lsn-state{font-size:12.5px;color:var(--ink-3);margin:0 0 10px}
+.lsn-card.soon{opacity:.62}
+.lsn-link{
+  background:none;border:0;padding:6px 0 0;cursor:pointer;
+  color:var(--acc);font-size:12.5px;font-weight:580;text-decoration:underline;
+}
 
 /* ---- the 'more' explanation under each edge ---- */
 .why{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
@@ -864,6 +915,13 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <div id="reviewOut"></div>
 </section>
 
+<!-- ============================ LEARN ============================ -->
+<section class="view" id="v-learn">
+  <h2>Lessons</h2>
+  <p class="sub">One edge at a time, one idea per screen. The point is to call the board before it calls itself.</p>
+  <div id="learnOut"></div>
+</section>
+
 <!-- ============================ RISK ============================ -->
 <section class="view" id="v-risk">
   <h2>Accounts &amp; risk</h2>
@@ -988,6 +1046,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
   <button data-go="plan"><span class="ico">◎</span>Ideas<span class="dot"></span></button>
   <button data-go="journal"><span class="ico">✎</span>Journal<span class="dot"></span></button>
   <button data-go="review"><span class="ico">◷</span>Review<span class="dot"></span></button>
+  <button data-go="learn"><span class="ico">❖</span>Learn<span class="dot"></span></button>
   <button data-go="risk"><span class="ico">◈</span>Risk<span class="dot"></span></button>
   <button data-go="set"><span class="ico">⚙</span>Settings<span class="dot"></span></button>
   <div class="nav-split" id="navSplit">
@@ -1007,7 +1066,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "5.7";
+var APP_VERSION = "5.8";
 var KEY = "ta_wpa_1";
 var STRIPPED = 0;
 var S = load();
@@ -1038,6 +1097,11 @@ function migrate(s){
      trades stay in storage, they just stop counting. */
   s.weeks = s.weeks || {};
   s.testDays = s.testDays || {};
+  /* v5.8 teaching mode. One entry per lesson id:
+     { last: screen index to resume at, seen: furthest screen reached,
+       done: the day key it was first completed }. Defaulted here so a
+     save file written by any earlier version opens untouched. */
+  s.lessons = s.lessons || {};
   /* v5.7 coach screenshots are never kept. Twenty of them filled the
      browser's ~5 MB allowance on the laptop. Strip any image data left in
      old coach threads; the message and the screenshot's name stay. */
@@ -2007,6 +2071,15 @@ function renderBoard(){
     r.why.forEach(function(w){ ul.appendChild(el("li", null, w)); });
     card.appendChild(ul);
 
+    /* v5.8 the second door into the lesson. The first is the Learn tab,
+       which stays reachable when the board is locked. */
+    if(lessonById(e.id)){
+      var lrn = el("button","lsn-link","Learn this edge");
+      lrn.type = "button";
+      lrn.onclick = function(){ openLesson(e.id); };
+      card.appendChild(lrn);
+    }
+
     if(r.status === "caution"){
       card.appendChild(el("div","edge-cost",
         "Minimum size only, and you type a reason before you take it."));
@@ -2369,7 +2442,7 @@ function go(name){
   }
   if(isDesktop()) document.body.classList.remove("coach-full");
   CURRENT = name;
-  ["prep","board","plan","journal","review","risk","coach","set"].forEach(function(v){
+  ["prep","board","plan","journal","review","learn","risk","coach","set"].forEach(function(v){
     $("v-" + v).classList.toggle("on", v === name);
   });
   syncNav(name);
@@ -2377,6 +2450,7 @@ function go(name){
   if(name === "plan"){ renderIdeaEdges(); renderIdeas(); }
   if(name === "journal") renderJournal();
   if(name === "review") renderReview();
+  if(name === "learn") renderLearn();
   if(name === "risk") renderRisk();
   if(name === "coach") renderCoach();
   window.scrollTo(0,0);
@@ -2953,6 +3027,7 @@ function closeWiz(){
   $("wiz").classList.remove("on");
   document.body.style.overflow = "";
   speechSynthesis && speechSynthesis.cancel && speechSynthesis.cancel();
+  WIZ.lesson = null;
   var cb = WIZ.onClose; WIZ.onClose = null;
   renderAll();
   if(cb) cb();
@@ -3025,6 +3100,407 @@ $("wizSay").onclick = function(){
   var s = WIZ.steps[WIZ.i];
   if(s && s.say) speak(s.say);
 };
+
+/* =====================================================================
+   Teaching mode (v5.8).
+
+   A lesson is the guided-prep wizard with nothing to answer: one idea
+   per screen, Back and Next, the same spoken line. The engine is
+   untouched — lessons set WIZ.steps the same way the trade and
+   post-loss flows already do.
+
+   Content is data. The other five edges are writing, not code.
+
+   Progress lives in S.lessons[id]: where to resume, how far you got,
+   and the day it was first finished.
+===================================================================== */
+var LESSONS = [{
+  id: "flow",
+  title: "Go With The Flow",
+  sub: "The weekly gives direction. The daily gives the trade.",
+  source: "Lesson spec v1 \u00b7 18 Sep 2026",
+  screens: [
+
+  /* ---------- BLOCK A — THE METHOD ---------- */
+  {
+    block: "The method \u00b7 1 of 15",
+    q: "The principle",
+    say: "Go with the flow is two charts doing two different jobs. The weekly gives you direction. The daily gives you the trade.",
+    blocks: [
+      ["p", "Go With The Flow means two charts doing two different jobs."],
+      ["box", null, "Two jobs", [
+        "The weekly gives you direction. You never trade off it.",
+        "The daily gives you the trade \u2014 entry, stop and target."
+      ]],
+      ["p", "You enter only at a value-area extreme, never in the middle. Your first target is VWAP."],
+      ["note", "If you are trading the daily without the weekly, you are not doing this trade. You are doing something else, and you should expect mixed results from it."]
+    ]
+  },
+  {
+    block: "The method \u00b7 2 of 15",
+    q: "The four rules of the profile",
+    sub: "These four rules are the whole engine. They work on any timeframe.",
+    say: "Four rules. Holding value, expect VWAP. Stuck at VWAP, expect the extreme back. Through VWAP, expect the other side. Holding outside value, expect the push to continue.",
+    blocks: [
+      ["ol", [
+        "Holding value \u2192 expect a move to VWAP.",
+        "At VWAP and can't get through it \u2192 expect a return to the value-area extreme.",
+        "Breaks through VWAP \u2192 expect the other side of value.",
+        "Holding outside value \u2192 expect the push to continue."
+      ]],
+      ["p", "Every read you make on either chart is one of these four. Commit them to memory. Everything else in this lesson is an application of them."],
+      ["note", "Note on language: value area high, value area low, VWAP, and a deviation away from value. Not \u201cone deviation from VWAP\u201d. Same words every time."]
+    ]
+  },
+  {
+    block: "The method \u00b7 3 of 15",
+    q: "Reading the weekly for direction",
+    sub: "Apply the four rules to the weekly chart. What they predict next is your direction.",
+    say: "Apply the four rules to the weekly. What they predict next is the direction you hunt for on the daily.",
+    blocks: [
+      ["ul", [
+        "Holding weekly value-area low \u2192 next likely move is up to VWAP \u2192 look long.",
+        "Holding weekly value-area high \u2192 next likely move is down to VWAP \u2192 look short.",
+        "Holding outside weekly value to the upside \u2192 the push continues \u2192 look long.",
+        "Holding outside weekly value to the downside \u2192 look short."
+      ]],
+      ["p", "You are not taking this trade. Price sitting at weekly value-area low is not an invitation to buy the weekly chart. It is telling you which direction to hunt for on the daily."],
+      ["box", "acc", "In prep", ["Tag it Longs, Shorts or Balanced on the Weekly view."]]
+    ]
+  },
+  {
+    block: "The method \u00b7 4 of 15",
+    q: "When the context changes, and when it doesn't",
+    sub: "Most of the time the direction is unchanged. There are only three places it flips.",
+    say: "There are only three places the context flips. Knowing the short list is what stops you re-reading the weekly every fifteen minutes.",
+    blocks: [
+      ["ul", [
+        "Price pushes outside value and holds there. You were holding value and looking for VWAP; now you expect the push to continue.",
+        "Price reaches VWAP and can't get through. Now expect a return to the extreme \u2014 the opposite direction to the one you held.",
+        "Price reaches the far extreme and can't get through. Now expect a return to VWAP."
+      ]],
+      ["p", "Getting <b>through</b> VWAP changes nothing. You were looking that way and you still are."],
+      ["note", "Knowing the short list of places the context can change is what stops you re-reading the weekly every fifteen minutes and talking yourself out of a good direction."]
+    ]
+  },
+  {
+    block: "The method \u00b7 5 of 15",
+    q: "Which week, which month",
+    sub: "A value area built from one session is not a value area.",
+    say: "Read the last completed week until this week has two completed sessions. Last completed month until this month has five. Count sessions, not calendar days.",
+    blocks: [
+      ["ul", [
+        "<b>Weekly:</b> read the last completed week until the current week has two completed sessions. Normally that means you switch on Wednesday. In a bank-holiday week it slips to Thursday.",
+        "<b>Monthly:</b> read the last completed month until the current month has five completed sessions."
+      ]],
+      ["p", "Count sessions, not calendar days, so a holiday takes care of itself."],
+      ["note", "The first Monday of a month is often doubly historical: last month for the monthly, last week for the weekly."]
+    ]
+  },
+  {
+    block: "The method \u00b7 6 of 15",
+    q: "When you can't tell",
+    say: "Sometimes you cannot tell whether a level is holding or breaking. Tag balanced and wait. Clarity comes from waiting, not from staring harder.",
+    blocks: [
+      ["p", "There will be times when you cannot tell whether a level is holding or breaking. Price pushed out of value, came straight back in, and you cannot say which way it resolved."],
+      ["p", "That is not a failure of skill. It happens to everyone and it happens often."],
+      ["p", "When it happens, tag <b>Balanced</b> and wait. Every new print is more information. Clarity comes from waiting, not from staring harder."],
+      ["box", "off", "What it means for the board", [
+        "A Balanced weekly means this edge is OFF for now. It can come on later in the session if the picture clears."
+      ]]
+    ]
+  },
+  {
+    block: "The method \u00b7 7 of 15",
+    q: "The monthly is confirmation only",
+    sub: "Weekly is king. Monthly is confirmation.",
+    say: "Weekly is king, monthly is confirmation. A balanced weekly is off whatever the monthly says. The two are not symmetrical.",
+    blocks: [
+      ["ul", [
+        "Monthly <b>agrees</b> with the weekly \u2192 higher quality. This is the best version of the trade.",
+        "Monthly <b>disagrees</b> \u2192 lower quality. Tradeable, at minimum size, with a typed reason.",
+        "Monthly <b>Balanced</b> \u2192 neither confirms nor denies. Lower quality, same treatment as disagreement.",
+        "Weekly <b>Balanced</b> \u2192 no trade, whatever the monthly says. The chart you take direction from has nothing to tell you."
+      ]],
+      ["note", "Korbs teaches the weekly alone first and treats the monthly as optional. This app asks for both, and uses the monthly only to raise or lower quality \u2014 never to create a direction the weekly hasn't given."],
+      ["box", "caution", "One case to watch", [
+        "A month that balanced for weeks and then resolved strongly at the end will still read Balanced on the calendar month, while the market has genuinely turned.",
+        "If the weekly is strongly directional and agrees with how the month ended, the calendar has cut the move in half. Treat it as CAUTION with a typed reason, not as ON. If it is a genuine edge, the journal will prove it over a few months and it can be promoted then, on evidence."
+      ]]
+    ]
+  },
+
+  /* ---------- BLOCK B — EXECUTION ---------- */
+  {
+    block: "Execution \u00b7 8 of 15",
+    q: "Entry location: value-area extremes only",
+    say: "On the daily, the only places you interact with the market are value-area high and value-area low. Treat them as areas, not exact prices.",
+    blocks: [
+      ["p", "On the daily, the only places you interact with the market are <b>value-area high</b> and <b>value-area low</b>."],
+      ["p", "Not mid-range. Not at VWAP. Not at a deviation away from value."],
+      ["p", "Treat the extremes as <b>areas, not exact prices</b>. Sometimes they hold to the tick. More often price stops slightly short or pushes slightly through. Expecting tick-perfect respect will cost you good trades and give you bad ones."],
+      ["note", "If price is running away from value and you are nowhere near an extreme, there is nothing to do. Missing that move is the correct outcome."]
+    ]
+  },
+  {
+    block: "Execution \u00b7 9 of 15",
+    q: "What you're giving up",
+    sub: "This trade idea costs you things. Knowing that in advance is what stops you improvising on a live chart.",
+    say: "This trade costs you things. No shorts at value-area high in a long context. No entries once price has run. No trade when the stop is unaffordable.",
+    blocks: [
+      ["ul", [
+        "<b>No shorts at value-area high in a long context.</b> If the weekly says long, shorts are off the table, even if price holds value-area high and rotates all the way back down. You miss it. That is not this trade.",
+        "<b>No entries once price has run.</b> If the information arrives when you are already far from the level, you have missed it. Chasing it is a different trade with undefined risk.",
+        "<b>No trade when the stop is unaffordable.</b> That one is on the next screen but one."
+      ]],
+      ["p", "The frustration people feel with this method is almost always the cost of doing something other than this method. The edge is repeatable. It will come round again."]
+    ]
+  },
+  {
+    block: "Execution \u00b7 10 of 15",
+    q: "The entry trigger: a pullback",
+    sub: "Reaching the level is not the entry. The pullback to it is.",
+    say: "Reaching the level is not the entry. The pullback to it is. Never enter on the first touch.",
+    blocks: [
+      ["p", "You are short at value-area high: price comes back up into the level and you enter on that retest. You are long at value-area low: price comes back down into it."],
+      ["p", "Never enter on the first touch. In hindsight every rotation is obvious; in real time you cannot know whether this touch is the one that holds. The pullback is what gives you a rotation to lean on, and that rotation is your stop."],
+      ["box", null, "Your trigger chart", [
+        "Pick one you can actually read \u2014 five, three or one minute, or the volume or range equivalent. Nothing slower than five minutes.",
+        "Which one is personal: too noisy and you can't read it, too zoomed out and you can't see the rotations."
+      ]]
+    ]
+  },
+  {
+    block: "Execution \u00b7 11 of 15",
+    q: "The stop: the previous rotation",
+    sub: "Not a round number, not a fixed number of points, not wherever makes the risk-to-reward look nice.",
+    say: "The stop goes beyond the previous rotation. No rotation to lean against means no trade. If the stop is too far to afford, skip it.",
+    blocks: [
+      ["ul", [
+        "Short at value-area high \u2192 the rotation you lean on is <b>above</b> you.",
+        "Long at value-area low \u2192 the rotation is <b>below</b> you."
+      ]],
+      ["box", "off", "Two hard consequences", [
+        "No rotation to lean against means no trade. If price has come straight down to the lows with nothing beneath to lean on, wait for one to form. Often it never does and price drops straight out \u2014 you were right to stay out.",
+        "If the stop is too far to afford, skip it. Sometimes the risk-to-reward looks fine but the cash risk is more than you'll take on one trade. Let it go. A tighter entry may set up later as more rotations print."
+      ]],
+      ["note", "This is not a \u201csucker stop\u201d. It gets run when the direction is wrong. Get the context right and it is a clean, defined risk."]
+    ]
+  },
+  {
+    block: "Execution \u00b7 12 of 15",
+    q: "Targets",
+    say: "Inside value, VWAP is the first target and the main management point. Outside value, target the deviation away from value and bank the first one.",
+    blocks: [
+      ["box", null, "Inside value", [
+        "VWAP is the first target and the main management point. Take profit there while you are learning.",
+        "Taking it to the other side of value is the more advanced version, and it means sitting through chop around VWAP with open profit \u2014 hard to do before the idea is second nature."
+      ]],
+      ["box", null, "Outside value", [
+        "Target the deviation away from value \u2014 the near band first, the far band as the extended target.",
+        "Outside value the market is in discovery mode and where it stops is less defined, so bank the first one."
+      ]]
+    ]
+  },
+
+  /* ---------- BLOCK C — THE PREP INPUTS ---------- */
+  {
+    block: "Prep inputs \u00b7 13 of 15",
+    q: "Chopping around VWAP?",
+    say: "Chopping around VWAP. Is price oscillating across it with no acceptance either side? It is the path that makes it chop, not the position.",
+    blocks: [
+      ["dt", "What it asks", "Is price oscillating across VWAP with no acceptance on either side?"],
+      ["dt", "Where to look", "The daily chart \u2014 price against VWAP over the session so far."],
+      ["dt", "What to look for", "Repeated crossings. Not one crossing, and not simply \u201cprice is near VWAP\u201d. It is the <b>path</b> that makes it chop, not the position."],
+      ["dt", "Why it matters", "VWAP is your first target and your management point. If price is oscillating across it, the target has no meaning and you will be stopped by noise before the idea resolves."],
+      ["box", "off", "Verdict", ["Yes \u2192 OFF."]],
+      ["flag", "Open loop for the board: this question currently does two jobs \u2014 real structural chop, and \u201cprice simply isn't at a trade location yet\u201d. The second belongs to the pullback question. Until it is split, answer it as written here: crossings, not position."]
+    ]
+  },
+  {
+    block: "Prep inputs \u00b7 14 of 15",
+    q: "Has the value-area extreme already failed repeatedly?",
+    say: "Has the extreme you want to trade from been tested and broken several times today? Once is noise. Several times is a pattern.",
+    blocks: [
+      ["dt", "What it asks", "Has the extreme you want to trade from been tested and broken several times today?"],
+      ["dt", "Where to look", "The daily chart \u2014 the specific extreme in your direction."],
+      ["dt", "What to look for", "Repeated failure to hold. Once is noise. Several times is a pattern."],
+      ["dt", "Why it matters", "The whole premise is that the extreme is defended. An extreme that keeps failing is being accepted through. The auction has moved on and the level you were going to lean on is no longer a level."],
+      ["box", "off", "Verdict", ["Yes \u2192 OFF."]]
+    ]
+  },
+  {
+    block: "Prep inputs \u00b7 15 of 15",
+    q: "Is a pullback available? \u2014 and predicting the board",
+    say: "Last screen. Work down the list in order and stop at the first line that matches. If you can run it in your head before opening the app, this lesson has done its job.",
+    blocks: [
+      ["dt", "What it asks", "Is there a pullback to the extreme you can actually enter on?"],
+      ["ul", [
+        "<b>Yes</b> \u2014 price is at or returning to the extreme, in your direction.",
+        "<b>Early</b> \u2014 it hasn't come yet, but the session is young and it may.",
+        "<b>No</b> \u2014 there is no pullback on offer. Price has gone."
+      ]],
+      ["p", "No \u2192 OFF. Early \u2192 CAUTION. Yes \u2192 the trade is live."],
+      ["p", "<b>Now predict the board.</b> Work down in this order, and stop at the first line that matches."],
+      ["box", "off", "OFF if any of these", [
+        "Weekly is Balanced",
+        "Chopping around VWAP",
+        "The extreme has already failed repeatedly",
+        "No pullback available"
+      ]],
+      ["box", "caution", "CAUTION if any of these \u2014 minimum size, and you type a reason first", [
+        "Monthly disagrees with the weekly, or is Balanced",
+        "Pullback is Early",
+        "You haven't read enough of the day yet to call it"
+      ]],
+      ["box", "ok", "ON only when all of this is true", [
+        "Weekly is directional and the monthly agrees",
+        "A pullback into value is available",
+        "Not chopping around VWAP",
+        "The extreme has not repeatedly failed"
+      ]],
+      ["p", "If you can run that list in your head before opening the app, and the board agrees with you, this lesson has done its job."],
+      ["flag", "As of v5.8, on four calls the board will disagree with this lesson and the lesson is the one that's right. It does not yet make a \u201cNo\u201d pullback a hard OFF; it treats the weekly and the monthly as equals rather than weekly-is-king; it calls a conflicted read OFF rather than CAUTION; and it reads the current period rather than the last completed one. Those four are logged as GWTF-1 to GWTF-4 and are not built yet. This note goes when they are."]
+    ]
+  }
+  ]
+}];
+
+function lessonById(id){
+  for(var i = 0; i < LESSONS.length; i++){ if(LESSONS[i].id === id) return LESSONS[i]; }
+  return null;
+}
+function lessonProg(id){
+  if(!S.lessons) S.lessons = {};
+  if(!S.lessons[id]) S.lessons[id] = { last: 0, seen: 0, done: "" };
+  return S.lessons[id];
+}
+
+/* Blocks are plain data so writing the other five edges never touches
+   this function. innerHTML carries nothing but the bold tags written
+   into the content above — no user input reaches here. */
+function lessonBlocks(box, blocks){
+  blocks.forEach(function(b){
+    var kind = b[0];
+    if(kind === "p"){
+      var pp = el("p"); pp.innerHTML = b[1]; box.appendChild(pp);
+    } else if(kind === "ul" || kind === "ol"){
+      var list = el(kind);
+      b[1].forEach(function(x){ var li = el("li"); li.innerHTML = x; list.appendChild(li); });
+      box.appendChild(list);
+    } else if(kind === "box"){
+      var d = el("div", "lsn-box" + (b[1] ? " " + b[1] : ""));
+      if(b[2]) d.appendChild(el("h4", null, b[2]));
+      (b[3] || []).forEach(function(x){ var q = el("p"); q.innerHTML = x; d.appendChild(q); });
+      box.appendChild(d);
+    } else if(kind === "dt"){
+      var w = el("div","lsn-dt");
+      w.appendChild(el("span","k", b[1]));
+      var v = el("span","v"); v.innerHTML = b[2]; w.appendChild(v);
+      box.appendChild(w);
+    } else if(kind === "note"){
+      box.appendChild(el("p","lsn-note", b[1]));
+    } else if(kind === "flag"){
+      box.appendChild(el("p","lsn-flag", b[1]));
+    }
+  });
+}
+
+function lessonSteps(L){
+  var n = L.screens.length;
+  return L.screens.map(function(sc, i){
+    return {
+      say: sc.say,
+      render: function(box){
+        /* progress is written as the screen is drawn, so closing with the
+           × keeps your place — there is nothing to submit in a lesson */
+        var pr = lessonProg(L.id);
+        pr.seen = Math.max(pr.seen || 0, i + 1);
+        if(i === n - 1){
+          if(!pr.done) pr.done = todayKey();
+          pr.last = 0;                 /* finished — next time starts at the top */
+        } else {
+          pr.last = i;
+        }
+        save();
+
+        box.appendChild(el("p","lsn-kicker", L.title + " \u00b7 " + sc.block));
+        box.appendChild(el("h2","wiz-q", sc.q));
+        if(sc.sub) box.appendChild(el("p","wiz-sub", sc.sub));
+        var wrap = el("div","lsn");
+        lessonBlocks(wrap, sc.blocks);
+        box.appendChild(wrap);
+      },
+      ready: function(){ return true; },
+      need: ""
+    };
+  });
+}
+
+function openLesson(id, start){
+  var L = lessonById(id);
+  if(!L){ toast("That lesson isn't written yet"); return; }
+  var steps = lessonSteps(L);
+  var pr = lessonProg(id);
+  var from = (start === undefined || start === null)
+    ? Math.min(Math.max(pr.last || 0, 0), steps.length - 1)
+    : start;
+  WIZ.steps = steps;
+  WIZ.i = from;
+  WIZ.lesson = L.title;
+  $("wiz").classList.add("on");
+  document.body.style.overflow = "hidden";
+  wizRender();
+  WIZ.onClose = function(){ renderLearn(); };
+}
+
+function lessonDate(key){
+  if(!key) return "";
+  var m = String(key).split("-");
+  if(m.length !== 3) return key;
+  var mo = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][(+m[1]) - 1] || "";
+  return (+m[2]) + " " + mo + " " + m[0];
+}
+
+function renderLearn(){
+  var out = $("learnOut");
+  if(!out) return;
+  out.innerHTML = "";
+
+  EDGES.forEach(function(e){
+    var L = lessonById(e.id);
+    var card = el("div","card lsn-card" + (L ? "" : " soon"));
+    card.appendChild(el("h3", null, e.name));
+    card.appendChild(el("p","hint", L ? L.sub : "Not written yet."));
+
+    if(!L){ out.appendChild(card); return; }
+
+    var pr = lessonProg(e.id), n = L.screens.length;
+    var state;
+    if(pr.done) state = "Completed " + lessonDate(pr.done) + " · " + n + " screens";
+    else if(pr.seen) state = "Stopped at screen " + ((pr.last || 0) + 1) + " of " + n;
+    else state = n + " screens · not started";
+    card.appendChild(el("p","lsn-state", state));
+
+    var row = el("div","cap-row");
+    var go1 = el("button","btn");
+    go1.type = "button";
+    go1.textContent = pr.done ? "Read it again"
+                    : (pr.seen && pr.last ? "Resume" : "Start");
+    go1.onclick = function(){ openLesson(e.id, pr.done ? 0 : undefined); };
+    row.appendChild(go1);
+
+    if(!pr.done && pr.seen && pr.last){
+      var go2 = el("button","cap-btn plain","Start again");
+      go2.type = "button";
+      go2.onclick = function(){ openLesson(e.id, 0); };
+      row.appendChild(go2);
+    }
+    card.appendChild(row);
+    card.appendChild(el("p","lsn-state", L.source));
+    out.appendChild(card);
+  });
+}
 
 
 /* =====================================================================
@@ -3278,12 +3754,13 @@ function whereNow(){
   var w = { prep:"the prep screen", board:"the edge board", plan:"his trade ideas",
             journal:"the journal", review:"the weekly review",
             risk:"accounts and risk", coach:"the coach",
-            set:"settings" }[CURRENT] || "the app";
+            learn:"the lessons", set:"settings" }[CURRENT] || "the app";
   var wiz = $("wiz");
   if(wiz && wiz.classList.contains("on") && WIZ.steps && WIZ.steps.length){
     var s = WIZ.steps[WIZ.i] || {};
-    w = "a guided step-by-step flow, step " + (WIZ.i + 1) + " of " + WIZ.steps.length +
-        (s.say ? " — the step on screen asks: " + s.say : "");
+    w = (WIZ.lesson ? "the " + WIZ.lesson + " lesson" : "a guided step-by-step flow") +
+        ", screen " + (WIZ.i + 1) + " of " + WIZ.steps.length +
+        (s.say ? " — the screen says: " + s.say : "");
   }
   return w;
 }
