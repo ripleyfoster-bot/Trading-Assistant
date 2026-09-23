@@ -674,6 +674,48 @@ nav .ico{font-size:17px;line-height:1}
   border:1px dashed var(--caution-line);background:var(--caution-bg);color:var(--caution);
   border-radius:var(--radius-sm);padding:10px 12px;margin:0 0 14px;
 }
+/* ---- v5.10 lesson charts. Drawn by the app from fixed data, never
+   stored images. Candles are ink, not green/red: status colours stay
+   reserved for permission signals. Only the stop uses --off. ---- */
+.lsn-chart{
+  border:1px solid var(--line);background:var(--card);
+  border-radius:var(--radius-sm);padding:10px 10px 9px;margin:0 0 12px;
+}
+.lsn-chart.muted{border-style:dashed;background:var(--card-2)}
+.lc-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 4px}
+.lc-tf{font-size:12.5px;font-weight:620;color:var(--ink-2)}
+.lc-tag{font-size:11.5px;font-weight:600;color:var(--acc);background:var(--acc-soft);
+  border-radius:20px;padding:2px 9px;white-space:nowrap}
+.lsn-chart.muted .lc-tag{color:var(--ink-2);background:var(--card)}
+.lsn-chart svg{display:block;width:100%;height:auto}
+.lsn .lc-cap{font-size:13.5px;line-height:1.45;color:var(--ink);margin:6px 0 3px}
+.lsn .lc-key{font-size:11.5px;line-height:1.4;color:var(--ink-3);margin:0}
+.lc-va{fill:var(--acc);fill-opacity:.07}
+.lc-zone{fill:var(--acc);fill-opacity:.2}
+.lc-ln{stroke:var(--ink-3);stroke-width:1}
+.lc-vw{stroke:var(--acc);stroke-width:1.4;stroke-dasharray:4 3}
+.lc-dev{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:1.5 3}
+.lc-lbl{fill:var(--ink-2);font:600 10px var(--f-body)}
+.lc-lbl.vw{fill:var(--acc)}
+.lc-lbl.poc{fill:var(--ink)}
+.lc-h{fill:var(--ink-3);fill-opacity:.1}
+.lc-hv{fill:var(--ink-3);fill-opacity:.2}
+.lc-hp{fill:var(--acc);fill-opacity:.38}
+.lc-poc{stroke:var(--acc);stroke-width:2}
+.lc-wk{stroke:var(--ink-2);stroke-width:1}
+.lc-up{fill:var(--card);stroke:var(--ink-2);stroke-width:1}
+.lc-dn{fill:var(--ink-2);stroke:var(--ink-2);stroke-width:1}
+.lc-ent{fill:var(--acc)}
+.lc-tgt{fill:none;stroke:var(--acc);stroke-width:1.6}
+.lc-tch{fill:none;stroke:var(--ink-3);stroke-width:1.4}
+.lc-stop{stroke:var(--off);stroke-width:1.5;stroke-dasharray:3 2}
+.lc-arr{stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:3 3;fill:none}
+.lc-arrh{fill:var(--ink-3)}
+.lc-mk{fill:var(--ink);font:650 10px var(--f-body);
+  paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round}
+.lsn-chart.muted .lc-mk{stroke:var(--card-2)}
+.lc-mk.stop{fill:var(--off)}
+.lc-mk.zone{fill:var(--acc)}
 .lsn-card .hint{margin-bottom:8px}
 .lsn-state{font-size:12.5px;color:var(--ink-3);margin:0 0 10px}
 .lsn-card.soon{opacity:.62}
@@ -1076,7 +1118,7 @@ details summary{cursor:pointer;font-size:13.5px;color:var(--ink-2);padding:4px 0
    Storage. Everything lives on this device. Prep is keyed by day so
    yesterday's read never quietly becomes today's.
 ===================================================================== */
-var APP_VERSION = "5.9";
+var APP_VERSION = "5.10";
 var KEY = "ta_wpa_1";
 var STRIPPED = 0;
 var S = load();
@@ -3183,6 +3225,14 @@ var LESSONS = [{
         "Holding outside weekly value to the upside \u2192 the push continues \u2192 look long.",
         "Holding outside weekly value to the downside \u2192 look short."
       ]],
+      ["chart", { base:"s3in", tag:"Direction: Longs",
+        cap:"<b>Holding VAL.</b> Next likely move is up to VWAP." }],
+      ["chart", { base:"s3in", mirror:true, tag:"Direction: Shorts",
+        cap:"<b>Holding VAH.</b> Next likely move is down to VWAP." }],
+      ["chart", { base:"s3out", tag:"Direction: Longs",
+        cap:"<b>Holding outside value, above.</b> The push continues." }],
+      ["chart", { base:"s3out", mirror:true, tag:"Direction: Shorts",
+        cap:"<b>Holding outside value, below.</b> The push continues." }],
       ["p", "You are not taking this trade. Price sitting at weekly value-area low is not an invitation to buy the weekly chart. It is telling you which direction to hunt for on the daily."],
       ["box", "acc", "In prep", ["Tag it Longs, Shorts or Balanced on the Weekly view."]]
     ]
@@ -3199,6 +3249,14 @@ var LESSONS = [{
         "Price reaches the far extreme and can't get through. Now expect a return to VWAP."
       ]],
       ["p", "Getting <b>through</b> VWAP changes nothing. You were looking that way and you still are."],
+      ["chart", { base:"f1", tag:"Flip 1",
+        cap:"<b>Pushes outside value and holds.</b> Now expect the push to continue." }],
+      ["chart", { base:"f2", tag:"Flip 2",
+        cap:"<b>Reaches VWAP and can't get through.</b> Now expect a return to the extreme." }],
+      ["chart", { base:"f3", tag:"Flip 3",
+        cap:"<b>Reaches the far extreme and can't get through.</b> Now expect a return to VWAP." }],
+      ["chart", { base:"f4", tag:"Not a flip", muted:true,
+        cap:"<b>Gets through VWAP.</b> Nothing changes. You're still looking the same way." }],
       ["note", "Knowing the short list of places the context can change is what stops you re-reading the weekly every fifteen minutes and talking yourself out of a good direction."]
     ]
   },
@@ -3224,6 +3282,11 @@ var LESSONS = [{
       ["p", "There will be times when you cannot tell whether a level is holding or breaking. Price pushed out of value, came straight back in, and you cannot say which way it resolved."],
       ["p", "That is not a failure of skill. It happens to everyone and it happens often."],
       ["p", "When it happens, tag <b>Balanced</b> and wait. Every new print is more information. Clarity comes from waiting, not from staring harder."],
+      ["p", "It also shows up as a week that rotates back and forth around VWAP inside value and never commits to either extreme. Same answer: Balanced, and wait."],
+      ["chart", { base:"bal1", tag:"Direction: Balanced",
+        cap:"<b>Pushed out, straight back in.</b> You can't say whether VAH is holding or breaking. Tag Balanced and wait." }],
+      ["chart", { base:"bal2", tag:"Direction: Balanced",
+        cap:"<b>Rotating around VWAP.</b> Neither extreme is tested with intent. Tag Balanced and wait." }],
       ["box", "off", "What it means for the board", [
         "A Balanced weekly means this edge is OFF for now. It can come on later in the session if the picture clears."
       ]]
@@ -3258,6 +3321,8 @@ var LESSONS = [{
       ["p", "On the daily, the only places you interact with the market are <b>value-area high</b> and <b>value-area low</b>."],
       ["p", "Not mid-range. Not at VWAP. Not at a deviation away from value."],
       ["p", "Treat the extremes as <b>areas, not exact prices</b>. Sometimes they hold to the tick. More often price stops slightly short or pushes slightly through. Expecting tick-perfect respect will cost you good trades and give you bad ones."],
+      ["chart", { base:"s8",
+        cap:"<b>Only the extremes.</b> Nothing in the middle, nothing at VWAP. The shaded bands are areas: price often stops short or pushes slightly through." }],
       ["note", "If price is running away from value and you are nowhere near an extreme, there is nothing to do. Missing that move is the correct outcome."]
     ]
   },
@@ -3283,6 +3348,10 @@ var LESSONS = [{
     blocks: [
       ["p", "You are short at value-area high: price comes back up into the level and you enter on that retest. You are long at value-area low: price comes back down into it."],
       ["p", "Never enter on the first touch. In hindsight every rotation is obvious; in real time you cannot know whether this touch is the one that holds. The pullback is what gives you a rotation to lean on, and that rotation is your stop."],
+      ["chart", { base:"s10", tag:"Weekly: Longs",
+        cap:"<b>Long at VAL.</b> Price comes back down into the level. Enter on the retest, not the first touch." }],
+      ["chart", { base:"s10", mirror:true, tag:"Weekly: Shorts",
+        cap:"<b>Short at VAH.</b> Price comes back up into the level. Enter on the retest, not the first touch." }],
       ["box", null, "Your trigger chart", [
         "Pick one you can actually read \u2014 five, three or one minute, or the volume or range equivalent. Nothing slower than five minutes.",
         "Which one is personal: too noisy and you can't read it, too zoomed out and you can't see the rotations."
@@ -3299,6 +3368,10 @@ var LESSONS = [{
         "Short at value-area high \u2192 the rotation you lean on is <b>above</b> you.",
         "Long at value-area low \u2192 the rotation is <b>below</b> you."
       ]],
+      ["chart", { base:"s11", tag:"Weekly: Longs",
+        cap:"<b>Long at VAL.</b> The rotation you lean on is below you. The stop goes beyond it." }],
+      ["chart", { base:"s11", mirror:true, tag:"Weekly: Shorts",
+        cap:"<b>Short at VAH.</b> The rotation you lean on is above you. The stop goes beyond it." }],
       ["box", "off", "Two hard consequences", [
         "No rotation to lean against means no trade. If price has come straight down to the lows with nothing beneath to lean on, wait for one to form. Often it never does and price drops straight out \u2014 you were right to stay out.",
         "If the stop is too far to afford, skip it. Sometimes the risk-to-reward looks fine but the cash risk is more than you'll take on one trade. Let it go. A tighter entry may set up later as more rotations print."
@@ -3315,10 +3388,18 @@ var LESSONS = [{
         "VWAP is the first target and the main management point. Take profit there while you are learning.",
         "Taking it to the other side of value is the more advanced version, and it means sitting through chop around VWAP with open profit \u2014 hard to do before the idea is second nature."
       ]],
+      ["chart", { base:"s12in", tag:"Weekly: Longs",
+        cap:"<b>Long inside value.</b> VWAP is target 1. VAH is the extended target." }],
+      ["chart", { base:"s12in", mirror:true, tag:"Weekly: Shorts",
+        cap:"<b>Short inside value.</b> VWAP is target 1. VAL is the extended target." }],
       ["box", null, "Outside value", [
         "Target the deviation away from value \u2014 the near band first, the far band as the extended target.",
         "Outside value the market is in discovery mode and where it stops is less defined, so bank the first one."
-      ]]
+      ]],
+      ["chart", { base:"s12out", tag:"Weekly: Longs",
+        cap:"<b>Long outside value.</b> Near dev is target 1. Far dev is the extended target." }],
+      ["chart", { base:"s12out", mirror:true, tag:"Weekly: Shorts",
+        cap:"<b>Short outside value.</b> Near dev is target 1. Far dev is the extended target." }]
     ]
   },
 
@@ -3395,6 +3476,268 @@ function lessonProg(id){
   return S.lessons[id];
 }
 
+/* ---- v5.10 lesson charts ----------------------------------------------
+   Every chart is fixed data: a price path (each candle opens at one
+   number and closes at the next), the lines, and the callouts. Wicks come
+   from a fixed formula, so the same chart draws the same way every time.
+   Prices are 0-100 illustrative units. A short version is the long one
+   mirrored top to bottom: VAH and VAL swap, labels follow the lines.
+------------------------------------------------------------------------*/
+var LC_LINE_LBL = { vah:"VAH", vwap:"VWAP", val:"VAL", near:"Near dev", far:"Far dev", poc:"POC" };
+
+/* v5.10 volume at a price, for the sideways histogram. Fixed shape: two
+   humps inside value (the larger one is the POC), thinning out past VAH
+   and VAL, with a fixed ripple so it doesn't look drawn by ruler. A short
+   chart reads it mirrored. Illustrative only. */
+var LC_VOL_STD = [[57, 9, 1], [42, 9, 0.75]];
+function lcVol(p, mirrored, shape){
+  if(mirrored) p = 100 - p;
+  var v = 0.03;
+  (shape || LC_VOL_STD).forEach(function(h){
+    v += h[2] * Math.exp(-(p - h[0]) * (p - h[0]) / (2 * h[1] * h[1]));
+  });
+  return v;
+}
+
+var LC_BASE = {
+  /* screen 3 — weekly */
+  s3in:  { tf:"Weekly", path:[46,42,38,34,31,33,30,32,34,33,35], extra:3,
+           lines:{vah:70,vwap:50,val:30,poc:57},
+           marks:[{k:"arrow",i:9.5,p:35,i2:12,p2:48,t:"Next: VWAP",pos:"l"}] },
+  s3out: { tf:"Weekly", path:[60,64,68,72,75,73,74,77,76,78,80], extra:3,
+           lines:{vah:70,vwap:50,val:30,poc:57},
+           marks:[{k:"arrow",i:9.5,p:80,i2:12,p2:90,t:"Push continues",pos:"l"}] },
+  /* screen 6 — weekly, two ways a week can read Balanced */
+  bal1: { tf:"Weekly", path:[48,54,60,66,71,76,72,66,68,71,67,70,68], extra:1,
+          lines:{vah:70,vwap:50,val:30,poc:57},
+          marks:[{k:"touch",i:4,p:78,t:"Pushed out",pos:"l"},
+                 {k:"touch",i:6,p:65,t:"Straight back in",pos:"b"},
+                 {k:"note",i:10.5,p:76,t:"Holding or breaking?",pos:"t"}] },
+  bal2: { tf:"Weekly", path:[44,49,54,57,53,48,45,48,53,56,52,47,46,50,53], extra:1,
+          lines:{vah:70,vwap:50,val:30,poc:54},
+          vol:[[54, 13, 1]],
+          marks:[{k:"note",i:6.5,p:64,t:"Neither extreme tested",pos:"t"}] },
+  /* screen 4 — weekly, the three flips and the one that isn't */
+  f1: { tf:"Weekly", path:[42,46,50,55,61,66,71,75,73,76,79], extra:3,
+        lines:{vah:70,vwap:50,val:30,poc:57},
+        marks:[{k:"touch",i:6,p:73,t:"Holds outside",pos:"t"},
+               {k:"arrow",i:9.5,p:79,i2:12,p2:88}] },
+  f2: { tf:"Weekly", path:[34,38,43,47,49,48,50,47,45,43,41], extra:3,
+        lines:{vah:70,vwap:50,val:30,poc:57},
+        marks:[{k:"touch",i:5,p:52,t:"Can't get through",pos:"t"},
+               {k:"arrow",i:9.5,p:41,i2:12,p2:32,t:"Back to VAL",pos:"b"}] },
+  f3: { tf:"Weekly", path:[50,54,58,62,66,69,68,70,67,64,61], extra:3,
+        lines:{vah:70,vwap:50,val:30,poc:57},
+        marks:[{k:"touch",i:6,p:72,t:"Can't get through",pos:"t"},
+               {k:"arrow",i:9.5,p:61,i2:12,p2:52,t:"Back to VWAP",pos:"b"}] },
+  f4: { tf:"Weekly", path:[32,35,38,42,46,50,53,56,58,60,62], extra:3,
+        lines:{vah:70,vwap:50,val:30,poc:57},
+        marks:[{k:"touch",i:4.5,p:50,t:"Through VWAP",pos:"l"},
+               {k:"arrow",i:9.5,p:62,i2:12,p2:69,t:"Still heading for VAH",pos:"t"}] },
+  /* screen 8 — daily, the only two places to act */
+  s8: { tf:"Daily", path:[50,56,62,67,69,66,60,53,46,39,33,31,35,41,47], extra:1,
+        lines:{vah:70,vwap:50,val:30,poc:57},
+        zones:[{p:66,p2:74},{p:26,p2:34}],
+        marks:[{k:"note",i:0.3,p:78,t:"Act here",pos:"r",cls:"zone"},
+               {k:"note",i:0.3,p:22,t:"Act here",pos:"r",cls:"zone"}] },
+  /* screens 10 and 11 — daily, same picture, different callouts */
+  s10: { tf:"Daily", path:[52,47,42,37,32,37,42,39,36,35,39,44,49], extra:1,
+         lines:{vah:70,vwap:50,val:30,poc:57},
+         marks:[{k:"touch",i:4,p:30,t:"First touch",pos:"b"},
+                {k:"entry",i:9,p:35,t:"Entry on pullback",pos:"b"}] },
+  s11: { tf:"Daily", path:[52,47,42,37,32,37,42,39,36,35,39,44,49], extra:1,
+         lines:{vah:70,vwap:50,val:30,poc:57},
+         marks:[{k:"touch",i:4,p:30,t:"Previous rotation",pos:"l"},
+                {k:"entry",i:9,p:35,t:"Entry",pos:"b"},
+                {k:"stop",i:3,i2:12.5,p:26,t:"Stop beyond it",pos:"b"}] },
+  /* screen 12 — targets */
+  s12in:  { tf:"Daily", path:[42,37,33,37,42,39,35,40,46,51,49,55,61,66,70], extra:1,
+            lines:{vah:70,vwap:50,val:30,poc:57},
+            marks:[{k:"entry",i:6,p:36,t:"Entry",pos:"b"},
+                   {k:"target",i:8,p:50,t:"Target 1",pos:"l"},
+                   {k:"target",i:13,p:70,t:"Extended",pos:"l"}] },
+  s12out: { tf:"Daily", path:[64,68,72,76,74,72,75,79,83,81,85,89,93], extra:1,
+            lines:{vah:70,near:82,far:94,poc:57},
+            marks:[{k:"entry",i:5,p:72,t:"Entry",pos:"b"},
+                   {k:"target",i:7,p:82,t:"Target 1",pos:"l"},
+                   {k:"target",i:12,p:94,t:"Extended",pos:"l"}] }
+};
+
+function lcMirror(b){
+  var m = function(p){ return 100 - p; };
+  var flipPos = { t:"b", b:"t", l:"l", r:"r" };
+  var lines = {};
+  Object.keys(b.lines).forEach(function(k){
+    var nk = k === "vah" ? "val" : k === "val" ? "vah" : k;
+    lines[nk] = m(b.lines[k]);
+  });
+  return {
+    tf: b.tf, extra: b.extra, short: true, vol: b.vol,
+    path: b.path.map(m),
+    lines: lines,
+    zones: (b.zones || []).map(function(z){ return { p:m(z.p), p2:m(z.p2) }; }),
+    marks: (b.marks || []).map(function(x){
+      var y = {}; for(var q in x) y[q] = x[q];
+      y.p = m(x.p); if(x.p2 != null) y.p2 = m(x.p2);
+      if(x.pos) y.pos = flipPos[x.pos];
+      if(x.t) y.t = x.t.replace(/\bVAH\b/g,"\u0001").replace(/\bVAL\b/g,"VAH").replace(/\u0001/g,"VAL");
+      return y;
+    })
+  };
+}
+
+function lessonChart(spec){
+  var NS = "http://www.w3.org/2000/svg";
+  var b = LC_BASE[spec.base];
+  if(spec.mirror) b = lcMirror(b);
+  var W = 340, H = 186, L = 6, R = 292, T = 10, B = H - 10;
+  /* the volume profile hangs off the right edge and grows leftwards,
+     behind the candles, up to 40% of the chart width */
+  var PR = R, HW = (R - L) * 0.4;
+
+  var n = b.path.length - 1, slots = n + (b.extra || 1);
+  var step = (PR - L) / slots, cw = Math.max(4, step * 0.56);
+  var candles = [];
+  for(var k = 0; k < n; k++){
+    var o = b.path[k], c = b.path[k + 1], w = 1 + ((k * 7) % 3);
+    candles.push({ o:o, c:c, h:Math.max(o, c) + w, l:Math.min(o, c) - w });
+  }
+  var lo = Infinity, hi = -Infinity;
+  function span(p){ if(p < lo) lo = p; if(p > hi) hi = p; }
+  candles.forEach(function(x){ span(x.h); span(x.l); });
+  Object.keys(b.lines).forEach(function(k){ span(b.lines[k]); });
+  (b.zones || []).forEach(function(z){ span(z.p); span(z.p2); });
+  (b.marks || []).forEach(function(x){ span(x.p); if(x.p2 != null) span(x.p2); });
+  lo -= 4; hi += 4;
+  function X(i){ return L + step * (i + 0.5); }
+  function Y(p){ return T + (hi - p) / (hi - lo) * (B - T); }
+  function r1(v){ return Math.round(v * 10) / 10; }
+
+  var svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", spec.cap.replace(/<[^>]+>/g, ""));
+  function add(tag, cls, at, txt){
+    var e = document.createElementNS(NS, tag);
+    if(cls) e.setAttribute("class", cls);
+    for(var a in at) e.setAttribute(a, typeof at[a] === "number" ? r1(at[a]) : at[a]);
+    if(txt != null) e.textContent = txt;
+    svg.appendChild(e); return e;
+  }
+
+  /* value area shading, then zones, then lines with their labels */
+  var ln = b.lines;
+  if(ln.vah != null && ln.val != null){
+    add("rect","lc-va",{ x:L, y:Y(Math.max(ln.vah, ln.val)), width:PR - L,
+      height:Math.abs(Y(ln.vah) - Y(ln.val)) });
+  }
+  (b.zones || []).forEach(function(z){
+    add("rect","lc-zone",{ x:L, y:Y(Math.max(z.p, z.p2)), width:PR - L,
+      height:Math.abs(Y(z.p) - Y(z.p2)) });
+  });
+  /* the volume profile: 2-unit rows across the visible range */
+  var rows = [], vmax = 0, bs = 2;
+  for(var rp = Math.floor(lo / bs) * bs; rp < hi; rp += bs){
+    var v = lcVol(rp + bs / 2, b.short, b.vol) * (0.86 + 0.28 * (((Math.round(rp / bs) * 37) % 7 + 7) % 7) / 6);
+    rows.push({ p:rp, v:v }); if(v > vmax) vmax = v;
+  }
+  var pocRow = Math.floor(ln.poc / bs) * bs;
+  rows.forEach(function(r){
+    /* every chart shares one value area, 30-70, which is its own mirror,
+       so rows inside it stay darker even where VAL is off the chart */
+    var inVA = r.p + bs / 2 >= 30 && r.p + bs / 2 <= 70;
+    var top = Math.max(T, Y(r.p + bs)), bot = Math.min(B, Y(r.p));
+    if(bot - top < 0.5) return;
+    var peak = lcVol(ln.poc, b.short, b.vol) * 1.14;
+    add("rect", r.p === pocRow ? "lc-hp" : inVA ? "lc-hv" : "lc-h",
+      { x:R - Math.max(1, HW * Math.min(1, r.v / peak)), y:top + 0.3,
+        width:Math.max(1, HW * Math.min(1, r.v / peak)), height:Math.max(0.6, bot - top - 0.6) });
+  });
+  Object.keys(ln).forEach(function(k){
+    if(k === "poc"){
+      add("line","lc-poc",{ x1:R - 8, x2:R + 2, y1:Y(ln.poc), y2:Y(ln.poc) });
+      add("text","lc-lbl poc",{ x:R + 5, y:Y(ln.poc) + 3.5 }, "POC");
+      return;
+    }
+    var cls = k === "vwap" ? "lc-vw" : (k === "near" || k === "far") ? "lc-dev" : "lc-ln";
+    add("line", cls, { x1:L, x2:R, y1:Y(ln[k]), y2:Y(ln[k]) });   /* runs through the histogram too */
+    add("text", "lc-lbl" + (k === "vwap" ? " vw" : ""),
+      { x:R + 5, y:Y(ln[k]) + 3.5 }, LC_LINE_LBL[k]);
+  });
+
+  /* candles: hollow up, filled down */
+  candles.forEach(function(x, i){
+    var cx = X(i);
+    add("line","lc-wk",{ x1:cx, x2:cx, y1:Y(x.h), y2:Y(x.l) });
+    var top = Y(Math.max(x.o, x.c)), bot = Y(Math.min(x.o, x.c));
+    add("rect", x.c >= x.o ? "lc-up" : "lc-dn",
+      { x:cx - cw / 2, y:top, width:cw, height:Math.max(1.2, bot - top) });
+  });
+
+  /* callouts */
+  function label(x, y, pos, t, cls, far){
+    if(!t) return;
+    var d = far ? 15 : 9, at = { x:x, y:y + 3.5, "text-anchor":"middle" };
+    if(pos === "t"){ at.y = y - d; }
+    else if(pos === "b"){ at.y = y + d + 7; }
+    else if(pos === "l"){ at.x = x - d; at["text-anchor"] = "end"; }
+    else if(pos === "r"){ at.x = x + d; at["text-anchor"] = "start"; }
+    /* keep a long label inside the frame. The svg isn't in the page yet,
+       so measure by estimate: about 5.6 units per character at 10px */
+    var tw = t.length * 5.6, a0 = at["text-anchor"];
+    var left = a0 === "start" ? at.x : a0 === "end" ? at.x - tw : at.x - tw / 2;
+    if(left < 2){ at.x = 2; at["text-anchor"] = "start"; }
+    else if(left + tw > PR - 2){ at.x = PR - 2; at["text-anchor"] = "end"; }
+    /* and clear of the top and bottom edges */
+    if(at.y < 11) at.y = 11;
+    if(at.y > H - 3) at.y = H - 3;
+    add("text", "lc-mk" + (cls ? " " + cls : ""), at, t);
+  }
+  (b.marks || []).forEach(function(m){
+    var x = X(m.i), y = Y(m.p);
+    if(m.k === "touch"){
+      add("circle","lc-tch",{ cx:x, cy:y, r:5.5 });
+    } else if(m.k === "target"){
+      add("circle","lc-tgt",{ cx:x, cy:y, r:5 });
+    } else if(m.k === "entry"){
+      /* the triangle sits just under a long entry, pointing up at the
+         price, and just over a short one, pointing down */
+      var up = !b.short, s = 5.5, g = up ? 1 : -1, tip = y + 2 * g, base = tip + 1.7 * s * g;
+      add("polygon","lc-ent",{ points:[x, tip, x - s, base, x + s, base].map(r1).join(" ") });
+      label(x, y, m.pos, m.t, m.cls, true);
+      return;
+    } else if(m.k === "stop"){
+      add("line","lc-stop",{ x1:X(m.i), x2:X(m.i2), y1:y, y2:y });
+      label(X((m.i + m.i2) / 2), y, m.pos, m.t, "stop");
+      return;
+    } else if(m.k === "arrow"){
+      var x2 = X(m.i2), y2 = Y(m.p2);
+      add("line","lc-arr",{ x1:x, y1:y, x2:x2, y2:y2 });
+      var a = Math.atan2(y2 - y, x2 - x), hl = 7;
+      var p1 = [x2 - hl * Math.cos(a - .45), y2 - hl * Math.sin(a - .45)];
+      var p2 = [x2 - hl * Math.cos(a + .45), y2 - hl * Math.sin(a + .45)];
+      add("polygon","lc-arrh",{ points:[x2, y2, p1[0], p1[1], p2[0], p2[1]].map(r1).join(" ") });
+      /* an arrow's label sits beyond its tip: above if it rises, below if it falls */
+      label(x2, y2, y2 < y ? "t" : "b", m.t);
+      return;
+    }
+    label(x, y, m.pos, m.t, m.cls);
+  });
+
+  var box = el("div", "lsn-chart" + (spec.muted ? " muted" : ""));
+  var head = el("div", "lc-head");
+  head.appendChild(el("span", "lc-tf", b.tf));
+  if(spec.tag) head.appendChild(el("span", "lc-tag", spec.tag));
+  box.appendChild(head);
+  box.appendChild(svg);
+  var cap = el("p", "lc-cap"); cap.innerHTML = spec.cap; box.appendChild(cap);
+  var key = [];
+  if(ln.vah != null || ln.val != null) key.push("VAH = value area high, VAL = value area low, POC = point of control, the price with the most volume");
+  if(ln.near != null) key.push("Dev = deviation away from value");
+  if(key.length) box.appendChild(el("p", "lc-key", key.join(". ") + "."));
+  return box;
+}
+
 /* Blocks are plain data so writing the other five edges never touches
    this function. innerHTML carries nothing but the bold tags written
    into the content above — no user input reaches here. */
@@ -3421,6 +3764,8 @@ function lessonBlocks(box, blocks){
       box.appendChild(el("p","lsn-note", b[1]));
     } else if(kind === "flag"){
       box.appendChild(el("p","lsn-flag", b[1]));
+    } else if(kind === "chart"){
+      box.appendChild(lessonChart(b[1]));   /* v5.10 */
     }
   });
 }
